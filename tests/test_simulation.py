@@ -56,7 +56,7 @@ def flat_world(w: int = 16, h: int = 16) -> WorldGrid:
 
 
 def no_resource_config() -> ResourceConfig:
-    return ResourceConfig(initial_density=0.0)
+    return ResourceConfig(initial_density=0.0, spawn_rate=0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +156,37 @@ def test_resource_regenerates():
     assert sim._resources[(5, 5)] == pytest_approx(15.0, abs=0.01)
 
 
+def test_resources_respawn_after_depletion():
+    """New resource cells appear over time even when the world starts empty."""
+    random.seed(1)
+    world = flat_world()
+    rc = ResourceConfig(initial_density=0.0, spawn_rate=1.0)
+    sim = Simulation(world, SimConfig(metabolism_per_tick=0.0, resource=rc))
+    for _ in range(20):
+        sim.step()
+    assert len(sim._resources) > 0
+
+
+def test_no_spawn_when_rate_zero():
+    random.seed(1)
+    world = flat_world()
+    sim = Simulation(world, SimConfig(resource=no_resource_config()))
+    for _ in range(50):
+        sim.step()
+    assert sim._resources == {}
+
+
+def test_resources_never_spawn_under_agents():
+    random.seed(2)
+    world = flat_world(4, 4)
+    rc = ResourceConfig(initial_density=0.0, spawn_rate=5.0, forage_amount=0.0)
+    sim = Simulation(world, SimConfig(metabolism_per_tick=0.0, resource=rc))
+    agents = sim.add_agent(StayAgent, count=4)
+    for _ in range(30):
+        sim.step()
+    assert not ({a.pos for a in agents} & set(sim._resources))
+
+
 def test_multi_agent_no_collision():
     """Multiple agents spawn without occupying the same cell."""
     random.seed(0)
@@ -218,6 +249,9 @@ def _run_all():
         test_foraging_gains_energy,
         test_resource_depletes,
         test_resource_regenerates,
+        test_resources_respawn_after_depletion,
+        test_no_spawn_when_rate_zero,
+        test_resources_never_spawn_under_agents,
         test_multi_agent_no_collision,
         test_world_state_shape,
         test_snapshot_agents_list,

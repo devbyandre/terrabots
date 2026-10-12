@@ -60,6 +60,8 @@ class ResourceConfig:
     regen_rate: float = 0.5           # units added per tick to each resource cell
     forage_amount: float = 20.0       # energy gained per tick when standing on a resource
     forage_cost: float = 2.0          # energy cost of foraging action itself
+    spawn_rate: float = 0.3           # expected new resource cells per tick; without it
+                                      # eaten-out cells never return and worlds starve
 
 
 @dataclass
@@ -419,6 +421,28 @@ class Simulation:
             self._resources[pos] = min(
                 rc.max_per_cell, self._resources[pos] + rc.regen_rate
             )
+        self._spawn_resources()
+
+    def _spawn_resources(self) -> None:
+        """Add new resource cells at random PLAIN/STAIRS cells.
+
+        spawn_rate is an expected count, so 0.3 means "one new cell roughly every
+        three ticks". Food never spawns under an agent, so standing still on an
+        eaten-out cell cannot farm it.
+        """
+        rc = self.config.resource
+        whole, frac = divmod(rc.spawn_rate, 1.0)
+        n_new = int(whole) + (1 if random.random() < frac else 0)
+        if n_new == 0:
+            return
+        occupied = {a.pos for a in self._agents.values() if a.alive}
+        for _ in range(n_new):
+            pos = (random.randrange(self.world.width), random.randrange(self.world.height))
+            # One attempt per spawn: on rough maps fewer spawns land, which is fine.
+            if pos in self._resources or pos in occupied:
+                continue
+            if self.world.get(*pos).terrain in (TerrainType.PLAIN, TerrainType.STAIRS):
+                self._resources[pos] = rc.max_per_cell * random.uniform(0.3, 1.0)
 
     # ------------------------------------------------------------------
     # Snapshot

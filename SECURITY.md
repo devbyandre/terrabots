@@ -8,8 +8,12 @@ screen (which imports every file in `bots/`), runs its code. Only run bots you
 trust, the same way you would treat any script you download.
 
 Turn time limits and the five-errors switch-off keep a slow or crashing bot from
-stalling a battle. They are not a sandbox. Running each bot in its own
-subprocess is on the roadmap.
+stalling a battle. With `bot_isolation = "process"` each bot also runs in its own
+process and is killed if it stops answering. None of this is a sandbox: a bot
+process runs with your permissions and can read your files or use the network.
+Running Terrabots in its Docker container (`docker compose up`) limits what bots
+can reach on your disk to the mounted `bots/`, `battles/` and `results/`, but the
+container still has network access, so this reduces the risk rather than removing it.
 
 ## The viewer server
 

@@ -1,0 +1,23 @@
+# docker compose up --build
+#   battle viewer:   http://localhost:8765/
+#   survival viewer: http://localhost:8766/
+services:
+  battle:
+    build: .
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./bots:/app/bots:ro          # edit your bots without rebuilding
+      - ./battles:/app/battles:ro
+      - ./results:/app/results       # results/*.json and *.csv land on the host
+    restart: unless-stopped
+
+  survival:
+    build: .
+    command: ["terrabots-run", "--host", "0.0.0.0", "--port", "8766", "--ticks", "100000",
+              "--agent", "bots.wanderer:WandererAgent=10"]
+    ports:
+      - "127.0.0.1:8766:8766"
+    volumes:
+      - ./bots:/app/bots:ro
+    restart: unless-stopped          # a finished or extinct run starts a new world

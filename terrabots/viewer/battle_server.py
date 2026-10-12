@@ -90,7 +90,8 @@ class BattleServer:
     async def serve_forever(self) -> None:
         async with serve(self._handler, self.host, self.port,
                          process_request=self._process_request, max_size=2**22):
-            print(f"  Battle viewer: http://{self.host}:{self.port}/")
+            shown = "localhost" if self.host in ("0.0.0.0", "::") else self.host  # all interfaces
+            print(f"  Battle viewer: http://{shown}:{self.port}/")
             if self.autostart:
                 await self._start(self.defaults.config.to_dict(),
                                   [{"spec": b.spec, "count": b.count} for b in self.defaults.bots])

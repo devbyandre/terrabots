@@ -59,7 +59,8 @@ class ViewerServer:
         self._server = await serve(
             self._handler, self.host, self.port, process_request=self._process_request
         )
-        print(f"  Viewer: http://{self.host}:{self.port}/")
+        shown = "localhost" if self.host in ("0.0.0.0", "::") else self.host  # all interfaces
+        print(f"  Viewer: http://{shown}:{self.port}/")
         return self
 
     async def __aexit__(self, *_: Any) -> None:

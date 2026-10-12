@@ -46,6 +46,13 @@ pip install -e ".[dev]"
 terrabots-battle                    # open http://localhost:8765/ → pick bots → Start
 ```
 
+Or with Docker, nothing to install but Docker itself:
+
+```bash
+docker compose up --build -d        # battle viewer  http://localhost:8765/
+                                    # survival viewer http://localhost:8766/
+```
+
 Headless, for tournaments and statistics:
 
 ```bash
@@ -106,11 +113,44 @@ path planning. It never sees global state: other bots are known only through rad
 `radar_turn` (degrees, clockwise, 0 = north) and `fire` power, all clamped by the
 rules each tick.
 
+**Graphical debugging** (Robocode's `onPaint`): draw in arena coordinates with
+`self.draw.line(...)`, `self.draw.circle(...)`, `self.draw.text(...)` inside
+`decide()`. The viewer shows them for the bot you follow, or for all bots with
+<kbd>D</kbd>. `self.rules` holds the battle's rules (`bullet_speed(power)`,
+`gun_cooling_rate`, ...).
+
+### Porting a Robocode bot
+
+`terrabots.battle.robocode.AdvancedRobot` gives you Robocode's API: queued
+commands that run over several ticks, "remaining" getters, relative bearings and
+the turn-complete conditions. A Java AdvancedRobot ports almost line by line:
+
+```python
+from terrabots.battle.robocode import AdvancedRobot, ScannedRobotEvent
+
+
+class MyRobot(AdvancedRobot):
+    def on_round_start(self, round_number, rounds):
+        self.set_adjust_radar_for_gun_turn(True)
+
+    def tick(self):                                  # one turn of run()'s while loop
+        self.set_turn_radar_right(360)
+        self.set_ahead(5)
+
+    def on_scanned_robot(self, e: ScannedRobotEvent):
+        self.set_turn_gun_right(e.absolute_bearing - self.gun_heading)
+        self.set_fire(2)
+```
+
+Distances are cells (1 cell = 16 px); see the module docstring for the
+differences.
+
 ## Battle rules
 
-Robocode's numbers, converted at 16 px per cell. Every value is a field of
-[`BattleConfig`](terrabots/battle/config.py), editable in the setup screen or a
-battle TOML.
+Robocode's rules as described on RoboWiki ([Game physics](https://robowiki.net/wiki/Robocode/Game_Physics),
+[Scoring](https://robowiki.net/wiki/Robocode/Scoring)), converted at 16 px per cell.
+Every value is a field of [`BattleConfig`](terrabots/battle/config.py), editable in
+the setup screen or a battle TOML.
 
 | Rule | Default |
 |---|---|
@@ -123,11 +163,13 @@ battle TOML.
 | Energy back on hit | the damage dealt (or Robocode's 3·p, or none) |
 | Gun heat | 1 + p/5 per shot, cools 0.1/tick |
 | Radar range | 75 cells (1200 px), needs line of sight |
-| Bullets | fly at muzzle height; terrain higher than that stops them |
-| Walls, rams | stop the tank; wall damage scales with speed, rams deal 0.6 each |
+| Bodies | 36 × 36 px squares (2.25 cells), axis-aligned |
+| Bullets | move before robots each tick; fly at muzzle height, so terrain higher than that stops them; crossing bullets destroy each other |
+| Walls, rams | stop the tank; wall damage scales with speed, rams deal 0.6 each; a bot moving away isn't stopped |
+| Inactivity | after 450 ticks without damage, everyone loses 0.1 energy per tick |
 
 Scoring follows Robocode: survival, last-survivor bonus, bullet and ram damage,
-and kill bonuses. The full spec, including the design decisions and what's still
+and kill bonuses (20 % / 30 % of all damage done to the bot you killed). The full spec, including the design decisions and what's still
 open, is in [docs/arena-spec.md](docs/arena-spec.md).
 
 <table>
@@ -205,15 +247,19 @@ tests/             pytest suite
 - [x] Survival mode, elevation-aware LOS, comms
 - [x] Battle mode: physics, radar, bullets, rounds, scoring, CLI, viewer
 - [ ] Teams (comms already exist) and team scoring
-- [ ] Bots in subprocesses for isolation and hard time limits
+- [x] Bots in subprocesses for isolation and hard time limits
+- [x] Robocode-style AdvancedRobot API for porting Java bots
 - [ ] Map files and a map editor
 - [ ] Gymnasium / PettingZoo wrapper for reinforcement learning
 - [ ] Survival rules inside battles (foraging as an arena option)
 
 ## A word on safety
 
-Bots are ordinary Python running in the simulator's process. Running someone
-else's bot means running their code, so only run bots you trust. See
+Bots are ordinary Python. With `bot_isolation = "process"` (the default in
+`battles/example.toml`, or `--isolation process`) every bot runs in its own
+process: bots think in parallel, and a bot that hangs is killed after a hard time
+limit. That keeps a battle running, but it is **not a sandbox**: running someone
+else's bot still means running their code, so only run bots you trust. See
 [SECURITY.md](SECURITY.md).
 
 ## Contributing

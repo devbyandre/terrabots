@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 — 2026-10-12
+
+### Added
+- Bots in their own processes (`bot_isolation = "process"`): parallel turns,
+  hard time limit, crash containment.
+- `terrabots.battle.robocode.AdvancedRobot`: Robocode's queued-command API for
+  porting Java bots.
+- Graphical debugging (`self.draw`, viewer key D), battle rules for bots
+  (`self.rules`), bullet ids in events (`bullet_fired`, `bullet_hit_bullet`).
+- Docker: `docker compose up` runs the battle and survival viewers.
+
+### Changed (checked against RoboWiki's Robocode pages)
+- Bullets move before robots; bodies are 36 px squares; crossing bullets
+  collide; a bot moving away from contact isn't stopped; inactivity drain after
+  450 quiet ticks; kill bonuses are a share of all damage to the victim; braking
+  through zero accelerates for the rest of the tick.
+- Radar range defaults to Robocode's 1200 px (75 cells).
+- Survival: visible terrain is cached per cell.
+
 ## 0.2.0 — 2026-10-12
 
 ### Added

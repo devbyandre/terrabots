@@ -36,7 +36,8 @@ Two game modes:
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-pytest -q                                      # 82 tests, all passing as of 2026-10-12
+pytest -q                                      # 104 tests, all passing as of 2026-10-12
+docker compose up --build -d                   # battle :8765 + survival :8766 in Docker
 terrabots-battle                               # battle setup screen → http://localhost:8765/
 terrabots-battle battles/example.toml --headless   # results table + results/*.json/csv
 terrabots-run                                  # survival sim + viewer → http://localhost:8765/
@@ -65,6 +66,9 @@ terrabots/
     scoring.py          Robocode-like scoring per round
     runner.py           BattleRunner: rounds, totals, BattleResults (JSON/CSV/table)
     agent.py, actions.py, observation.py, events.py, geometry.py   bot-facing API
+    robocode.py         AdvancedRobot: Robocode's queued-command API for ported bots
+    isolation.py        ProcessBot: one process per bot (bot_isolation = "process")
+    debug.py            DebugCanvas behind agent.draw (Robocode onPaint)
     discovery.py        finds BattleAgent subclasses in bots/ and terrabots/agents/
     cli.py              terrabots-battle
   agents/               demo battle bots: SittingDuck, SpinBot, Tracker, Crazy
@@ -100,9 +104,10 @@ tests/                  pytest, one function per rule/scenario
 7. **Agents only see what they perceive.** `Observation` is range- and LOS-filtered;
    never hand agents global state.
 8. Resources live in `Simulation._resources` (`{(x, y): amount}`), not on cells.
-9. **Battle tick order** (`Arena.step`): observe + decide (timed) → cool/fire (gun
-   heading before turning) → turn → move (walls, rams) → bullets → radar → deaths →
-   comms. Events reach bots one tick later.
+9. **Battle tick order** (`Arena.step`, Robocode's loop per RoboWiki): observe +
+   decide (timed; process bots in parallel) → move bullets (incl. last tick's) →
+   cool/fire (gun heading before turning) → turn → move bodies (walls, rams) →
+   radar → inactivity drain → deaths → comms. Events reach bots one tick later.
 10. **Battle perception:** other bots only via radar (`scanned_bots`) and events;
     terrain via a range-limited `TerrainView`. Headings are Robocode's (0 = north,
     clockwise). Robocode px values convert at `PX_PER_CELL = 16`.
@@ -112,9 +117,13 @@ tests/                  pytest, one function per rule/scenario
 ## Current status (2026-10-12)
 
 Verified:
-- `pytest`: 82 passed (terrain, comms, survival sim, battle config, physics, arena,
-  runner determinism, CLI, battle server WebSocket round trip).
-- Headless battles of the demo bots (~10k ticks/s with 6 bots on this machine).
+- `pytest`: 104 passed (terrain, comms, survival sim, battle config, physics incl.
+  the RoboWiki rules, arena, runner determinism, Robocode API, process isolation,
+  CLI, battle server WebSocket round trip).
+- Headless battles of the demo bots (~8.5k ticks/s with 6 bots in-process; process
+  isolation is ~4x slower because of the per-tick pipe round trips).
+- Docker: `docker compose up` in the private mubot repo served both viewers;
+  checked over HTTP and in headless Chromium.
 - Battle viewer and survival viewer driven in headless Chromium (Playwright,
   SwiftShader) with Three.js 0.186.1 from jsDelivr: setup → battle → results work,
   no console errors. **Not yet checked in a real desktop browser / GPU.**
@@ -124,33 +133,30 @@ Decisions taken with the spec defaults (spec §9), not yet confirmed by André:
 hybrid continuous-on-grid; hit energy return = damage dealt; radar-only
 perception; disabled at exactly 0 energy (firing is capped at remaining energy,
 which is how a bot reaches 0; spec §4 originally said such a shot is rejected,
-which made "disabled" unreachable); free-for-all only; Robocode scoring weights;
-radar range 25 cells (spec value; Robocode's 1200 px would be 75).
+which made "disabled" unreachable); free-for-all only. Changed later to follow
+Robocode: radar range 75 cells (was 25), 36 px square hitbox (was 0.45-cell
+circle), kill bonus on all damage to the victim (RoboWiki wording, read literally).
 
 ## Known issues / tech debt (prioritised)
 
-1. **MuBot battle port** lives in the private repo (`../mubot`,
-   `devbyandre/terrabots_mubot`); never add MuBot code here. A faithful port needs
-   the original Java source in that repo's `reference/`.
-2. Battle `foraging_enabled` (survival rules inside battles) and teams are not built.
-3. Bots run in-process; time budget is soft (a hung `decide()` blocks). Subprocess
-   isolation is the planned fix (spec §8).
-4. Battle terrain checks only the body's centre cell; a body can overlap a rock
-   cell's edge by up to its radius. Bullets hit-test in 2D (flight height only
-   matters for terrain blocking).
-5. Tanks are procedural low-poly meshes; the Quaternius GLB was not used (its node
-   structure is still unchecked).
-6. Survival `world_state()` still sends one JSON dict per cell (battle uses flat
-   base64 arrays; port that if survival maps grow past ~64×64).
-7. Survival observation cost: LOS raycast per cell in perception radius per agent.
+1. MuBot (battle port of the Java bot + survival version) lives in the private
+   repo (`../mubot`, `devbyandre/terrabots_mubot`); never add MuBot code here.
+2. Teams and `foraging_enabled` (survival rules inside battles) are not built.
+3. Process isolation is not a sandbox (see SECURITY.md); the Python API defaults
+   to in-process so notebook/test-local bots work.
+4. Bullets hit-test in 2D (flight height only matters for terrain blocking).
+   Bodies are axis-aligned squares (Robocode); every covered cell must be enterable.
+5. Tanks are procedural low-poly meshes; the Quaternius GLB was never used.
+6. Survival `world_state()` still sends one JSON dict per cell.
+7. Survival observations: terrain LOS is cached per cell, but filling the cache
+   costs ~3 ms per new cell (exact Bresenham per target). A vectorised or
+   shadow-casting LOS would be faster but must keep invariant 3's results.
 8. `_random_passable_cell` rebuilds the occupied set on every attempt.
 9. No map file loader; no Gymnasium/PettingZoo wrapper.
-10. Pages: GitHub Pages must be enabled once (Settings → Pages → main, /docs).
 
 ## Next work
 
-Confirm the §9 decisions with André; MuBot battle port (private repo); teams;
-subprocess bots; map files.
+Teams (postponed by André), map files, Gymnasium wrapper, faster survival LOS.
 
 ## Conventions
 
@@ -161,4 +167,5 @@ subprocess bots; map files.
 - Bot spec format everywhere (CLI, UI, configs): `package.module:ClassName[=count]`.
 - Keep `bots/wanderer.py` as the smallest working example; it's the first file a
   learner reads.
-- Commit messages: imperative, explain why.
+- Commit messages: imperative, explain why. No Claude co-author / session
+  trailers (André's rule; history was rewritten to remove them).

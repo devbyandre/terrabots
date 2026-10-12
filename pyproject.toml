@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terrabots"
-version = "0.2.0"
+version = "0.3.0"
 description = "Robocode-style tank battles and agent simulation on 2.5D terrain, for learning Python, AI, statistics and ML"
 readme = "README.md"
 license = { file = "LICENSE" }

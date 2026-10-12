@@ -597,7 +597,7 @@ function clearBattle() {
 // Radar wedge from radar_prev to radar (shortest way), with a short fading trail.
 const RADAR_TRAIL = 5;
 function radarWedge(t, bot) {
-  const range = battleConfig ? battleConfig.radar_range : 25;
+  const range = battleConfig ? battleConfig.radar_range : 75;
   let sweep = ((bot.radar - bot.radar_prev + 540) % 360) - 180;
   if (Math.abs(sweep) < 0.5) return;                            // radar not turning: nothing swept
   if (Math.abs(sweep) < 3) sweep = Math.sign(sweep) * 3;        // keep a locked radar visible

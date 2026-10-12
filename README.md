@@ -122,7 +122,7 @@ battle TOML.
 | Damage | 4·p, plus 2·(p − 1) above power 1 |
 | Energy back on hit | the damage dealt (or Robocode's 3·p, or none) |
 | Gun heat | 1 + p/5 per shot, cools 0.1/tick |
-| Radar range | 25 cells, needs line of sight |
+| Radar range | 75 cells (1200 px), needs line of sight |
 | Bullets | fly at muzzle height; terrain higher than that stops them |
 | Walls, rams | stop the tank; wall damage scales with speed, rams deal 0.6 each |
 

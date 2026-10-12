@@ -112,8 +112,8 @@ class BattleConfig:
     hit_energy_return: str = "damage"        # "damage" | "robocode" (3p) | "none"
 
     # --- Radar ---
-    radar_range: float = 25.0                # Robocode 1200 px = 75 cells; shorter so
-                                             # terrain and positioning matter
+    radar_range: float = 1200 / PX_PER_CELL  # 75 cells, as in Robocode; line of sight
+                                             # is what makes terrain matter
     radar_requires_los: bool = True
 
     # --- Collisions ---

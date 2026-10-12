@@ -74,7 +74,7 @@ in the setup screen, sent over the WebSocket as JSON. All values validated on lo
 | | `gun_heat_per_shot` | `1 + p/5` | can't fire while heat > 0 |
 | | `gun_cooling_rate` | 0.1 / tick | |
 | | `hit_energy_return` | `"damage"` *(decision)* | see §4 |
-| Radar | `radar_range` | 25 cells | Robocode: 1200 px |
+| Radar | `radar_range` | 75 cells | Robocode: 1200 px |
 | | `max_radar_turn_deg` | 45 | per tick |
 | | `radar_requires_los` | `true` | uses existing elevation-aware `VisibilityMgr` |
 | Mode | `foraging_enabled` | `false` | survival food/metabolism inside battles |

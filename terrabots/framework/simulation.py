@@ -120,6 +120,8 @@ class Simulation:
 
         self._tick: int = 0
         self._messages_sent_this_tick: int = 0
+        # (cell, eye height, range) -> visible TerrainPercepts; terrain is static
+        self._terrain_cache: dict[tuple, list[TerrainPercept]] = {}
 
         self._seed_resources()
 
@@ -347,7 +349,6 @@ class Simulation:
     def _build_observation(self, agent: Agent, inbox: list) -> Observation:
         visible_agents: list[AgentPercept] = []
         visible_resources: list[ResourcePercept] = []
-        visible_terrain: list[TerrainPercept] = []
         nearest_resource: tuple[int, int] | None = None
         nearest_dist = math.inf
 
@@ -380,22 +381,7 @@ class Simulation:
                         nearest_dist = dist_sq
                         nearest_resource = rpos
 
-        # Visible terrain cells (within perception range + LOS)
-        ax, ay = agent.pos
-        r = int(agent.profile.max_perception_range)
-        for tx in range(max(0, ax - r), min(self.world.width, ax + r + 1)):
-            for ty in range(max(0, ay - r), min(self.world.height, ay + r + 1)):
-                dx, dy = tx - ax, ty - ay
-                if dx * dx + dy * dy > r * r:
-                    continue
-                if self._visibility.has_line_of_sight(agent.pos, (tx, ty), agent.profile):
-                    cell = self.world.get(tx, ty)
-                    visible_terrain.append(TerrainPercept(
-                        pos=(tx, ty),
-                        terrain_name=cell.terrain.name,
-                        elevation=cell.elevation,
-                        water_depth=cell.water_depth,
-                    ))
+        visible_terrain = self._visible_terrain(agent)
 
         own_cell = self.world.get(*agent.pos)
         return Observation(
@@ -410,6 +396,37 @@ class Simulation:
             nearest_resource=nearest_resource,
             inbox=list(inbox),
         )
+
+    def _visible_terrain(self, agent: Agent) -> list[TerrainPercept]:
+        """Terrain cells within perception range and LOS of the agent's cell.
+
+        Terrain is static, so the result depends only on the cell and the
+        profile's eye height and range: cache it instead of re-raycasting every
+        cell in range for every agent every tick (that was most of a tick's cost).
+        """
+        p = agent.profile
+        key = (agent.pos, p.eye_height_offset, p.max_perception_range)
+        cached = self._terrain_cache.get(key)
+        if cached is not None:
+            return cached
+        percepts: list[TerrainPercept] = []
+        ax, ay = agent.pos
+        r = int(p.max_perception_range)
+        for tx in range(max(0, ax - r), min(self.world.width, ax + r + 1)):
+            for ty in range(max(0, ay - r), min(self.world.height, ay + r + 1)):
+                dx, dy = tx - ax, ty - ay
+                if dx * dx + dy * dy > r * r:
+                    continue
+                if self._visibility.has_line_of_sight(agent.pos, (tx, ty), p):
+                    cell = self.world.get(tx, ty)
+                    percepts.append(TerrainPercept(
+                        pos=(tx, ty),
+                        terrain_name=cell.terrain.name,
+                        elevation=cell.elevation,
+                        water_depth=cell.water_depth,
+                    ))
+        self._terrain_cache[key] = percepts
+        return percepts
 
     # ------------------------------------------------------------------
     # Resource regeneration

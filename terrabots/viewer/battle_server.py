@@ -170,7 +170,9 @@ class BattleServer:
         bots = [b for b in bots if int(b.get("count", 0)) > 0]
         try:
             bf = BattleFile.from_dict({**config, "bots": bots})
-            runner = BattleRunner(bf.config, bf.bots, time_budget_ms=self.time_budget_ms)
+            # Starting bot processes takes a moment; keep the event loop responsive.
+            runner = await asyncio.to_thread(BattleRunner, bf.config, bf.bots,
+                                             time_budget_ms=self.time_budget_ms)
         except (BattleConfigError, ValueError, ImportError, AttributeError, RuntimeError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
             return
@@ -243,3 +245,5 @@ class BattleServer:
         except Exception as exc:
             logger.exception("Battle crashed")
             await self._broadcast({"type": "error", "message": f"Battle crashed: {exc}"})
+        finally:
+            runner.close()

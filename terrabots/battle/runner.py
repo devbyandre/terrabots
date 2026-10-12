@@ -37,6 +37,7 @@ from terrabots import map_generator
 from terrabots.battle.agent import BattleAgent
 from terrabots.battle.arena import Arena
 from terrabots.battle.config import BattleConfig, BotEntry
+from terrabots.battle.isolation import ProcessBot, spec_of, start_bots
 from terrabots.battle.scoring import BotScore
 from terrabots.world_terrain import WorldGrid
 
@@ -153,6 +154,23 @@ class BattleRunner:
         }
         self.round_rankings: list[dict[str, Any]] = []
 
+        # One process per bot for the whole battle (bot_isolation = "process").
+        self.processes: list[ProcessBot] = []
+        if config.bot_isolation == "process":
+            self.processes = start_bots([spec_of(cls) for cls, _ in self.names], self.world, config)
+
+    def close(self) -> None:
+        """Stop bot processes. Safe to call more than once."""
+        for p in self.processes:
+            p.close()
+        self.processes = []
+
+    def __enter__(self) -> "BattleRunner":
+        return self
+
+    def __exit__(self, *_: Any) -> None:
+        self.close()
+
     @property
     def done(self) -> bool:
         return self.round >= self.config.rounds and self.arena_finished
@@ -161,9 +179,11 @@ class BattleRunner:
         self.round += 1
         agents: list[BattleAgent] = []
         for bid, (cls, name) in enumerate(self.names):
-            agent = cls()
-            agent.bot_id, agent.name, agent.memory = bid, name, self.memory[cls]
+            agent = self.processes[bid] if self.processes else cls()
+            agent.bot_id, agent.name = bid, name
             agent.rules = dataclasses.replace(self.config)
+            if not self.processes:
+                agent.memory = self.memory[cls]
             agents.append(agent)
         self.arena = Arena(self.config, self.world, agents, self.round, self.rng,
                            time_budget_ms=self.time_budget_ms)
@@ -204,6 +224,12 @@ class BattleRunner:
         return BattleResults(self.config.to_dict(), rows, self.round_rankings)
 
     def run(self, verbose: bool = False) -> BattleResults:
+        try:
+            return self._run(verbose)
+        finally:
+            self.close()
+
+    def _run(self, verbose: bool) -> BattleResults:
         while self.round < self.config.rounds:
             arena = self.start_round()
             while not arena.over:

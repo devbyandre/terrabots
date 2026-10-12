@@ -41,6 +41,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
                    help="viewer: list this bot in the setup screen (e.g. from an installed package)")
     p.add_argument("--rounds", type=int, help="override number of rounds")
     p.add_argument("--seed", type=int, help="override seed")
+    p.add_argument("--isolation", choices=["none", "process"],
+                   help="run each bot in its own process (overrides the battle file)")
     p.add_argument("--no-time-limit", action="store_true",
                    help="never skip slow turns (also automatic under a debugger)")
     p.add_argument("--results-dir", default="results", help="where to save results (default results/)")
@@ -60,7 +62,8 @@ def _parse_bot(spec: str) -> BotEntry:
 def load_battle(args: argparse.Namespace) -> BattleFile:
     try:
         bf = BattleFile.load(args.battle_file) if args.battle_file else BattleFile.from_dict({})
-        overrides = {k: v for k, v in (("rounds", args.rounds), ("seed", args.seed)) if v is not None}
+        overrides = {k: v for k, v in (("rounds", args.rounds), ("seed", args.seed),
+                                        ("bot_isolation", args.isolation)) if v is not None}
         if overrides:
             bf.config = type(bf.config).from_dict({**bf.config.to_dict(), **overrides})
     except (BattleConfigError, OSError) as exc:

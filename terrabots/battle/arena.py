@@ -45,6 +45,7 @@ from terrabots.battle.events import (
     ScannedBot,
 )
 from terrabots.battle.geometry import clamp, distance, heading_to, normalize_heading
+from terrabots.battle.isolation import BotProcessError, ProcessBot
 from terrabots.battle.observation import BattleObservation, TerrainView
 from terrabots.battle.physics import (
     ALIVE,
@@ -168,7 +169,7 @@ class Arena:
         self._frame_events = []
         standing = self.standing()
 
-        actions = {s.body.bot_id: self._decide(s) for s in standing}
+        actions = self._decide_all(standing)
         for s in standing:
             s.events = _empty_events()
         self._comms.clear()
@@ -202,17 +203,42 @@ class Arena:
         self.scorer.scores[s.body.bot_id].skipped_turns += 1
         return BattleAction(velocity=s.last_velocity_cmd)
 
-    def _decide(self, s: _Slot) -> BattleAction:
-        s.drawings = []
-        if s.body.state != ALIVE or s.switched_off:
-            return BattleAction()
-        obs = self._observe(s)
-        s.agent.draw.clear()
+    def _decide_all(self, standing: list[_Slot]) -> dict[int, BattleAction]:
+        """Ask every active bot for its action. Bots in their own process all get
+        their observation first and think in parallel; then answers are collected."""
+        active = [s for s in standing if s.body.state == ALIVE and not s.switched_off]
+        for s in standing:
+            s.drawings = []
+        remote = [s for s in active if isinstance(s.agent, ProcessBot)]
+        for s in remote:
+            s.agent.request_decide(self._observe(s))
+        actions = {s.body.bot_id: BattleAction() for s in standing}
+        for s in active:
+            actions[s.body.bot_id] = self._decide(s, remote=s in remote)
+        return actions
+
+    def _decide(self, s: _Slot, remote: bool = False) -> BattleAction:
         start = time.perf_counter()
         try:
-            action = s.agent.decide(obs)
+            if remote:
+                action = s.agent.collect_decide(self.time_budget_ms)
+                elapsed_ms = s.agent.last_elapsed_ms     # measured in the bot's process
+            else:
+                obs = self._observe(s)
+                s.agent.draw.clear()
+                action = s.agent.decide(obs)
+                elapsed_ms = (time.perf_counter() - start) * 1000
             if not isinstance(action, BattleAction):
                 raise TypeError(f"decide() returned {type(action).__name__}, expected BattleAction")
+        except BotProcessError as exc:
+            # A crashed or killed process won't come back this battle.
+            if s.agent.is_dead:
+                s.switched_off = True
+            s.consecutive_errors += 1
+            logger.warning("%s: %s", s.agent.name, exc)
+            if s.consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                s.switched_off = True
+            return self._skip(s)
         except Exception:
             s.consecutive_errors += 1
             logger.warning("%s raised in decide() (round %d, tick %d)", s.agent.name,
@@ -224,7 +250,6 @@ class Arena:
             return self._skip(s)
         s.consecutive_errors = 0
         s.drawings = list(s.agent.draw.shapes)
-        elapsed_ms = (time.perf_counter() - start) * 1000
         if self.time_budget_ms and elapsed_ms > self.time_budget_ms:
             return self._skip(s)
         s.last_velocity_cmd = action.velocity

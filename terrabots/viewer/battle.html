@@ -283,6 +283,7 @@ const FIELDS = [
     ['inactivity_energy_drain', 'Inactivity drain', 'float', 'Energy per tick while inactive. Robocode: 0.1.'],
     ['comms_enabled', 'Comms enabled', 'bool', 'Range + LOS gated messages between bots.'],
     ['decide_time_budget_ms', 'decide() budget (ms)', 'float?', 'Slower turns are skipped. Empty = unlimited.'],
+    ['bot_isolation', 'Bot isolation', ['process', 'none'], 'process: each bot in its own process (safer, parallel, hard time limit). none: in-process (fastest start, easiest debugging).'],
   ]],
 ];
 

@@ -30,6 +30,7 @@ _CHOICES: dict[str, tuple[str, ...]] = {
     "terrain": ("procedural", "flat"),
     "damage_formula": ("robocode", "linear"),
     "hit_energy_return": ("damage", "robocode", "none"),
+    "bot_isolation": ("none", "process"),
 }
 
 # (min, max) inclusive; None = unbounded on that side.
@@ -126,6 +127,8 @@ class BattleConfig:
     # --- Mode ---
     comms_enabled: bool = True
     decide_time_budget_ms: float | None = 20.0  # None/0 = unlimited (debugging)
+    bot_isolation: str = "none"              # "process": each bot in its own process
+                                             # (hard time limit, parallel turns)
 
     def __post_init__(self) -> None:
         self.validate()

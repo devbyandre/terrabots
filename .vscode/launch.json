@@ -1,0 +1,49 @@
+{
+  // F5 / Run and Debug panel. Breakpoints in bots/*.py and terrabots/** work in all configs.
+  // Windows: the interpreter path in settings.json is .venv/Scripts/python.exe instead.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Terrabots: Run with viewer (Wanderer x10)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "terrabots.run",
+      "args": ["--agents", "10", "--ticks", "2000", "--verbose"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Terrabots: Debug bots/wanderer",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "terrabots.run",
+      "args": [
+        "--agent", "bots.wanderer:WandererAgent=10",
+        "--ticks", "2000", "--seed", "1", "--verbose"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Terrabots: Headless run (fast, no browser)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "terrabots.run",
+      "args": ["--headless", "--ticks", "500", "--seed", "1"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terrabots: Debug current test file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}

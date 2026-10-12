@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Terrabots Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0f1a; color: #cdd; font-family: monospace; overflow: hidden; }
+    canvas { display: block; }
+
+    #hud {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid #334;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      line-height: 1.8;
+      pointer-events: none;
+      min-width: 180px;
+    }
+    #hud .label { color: #78a; }
+    #hud .val   { color: #eef; font-weight: bold; }
+
+    #status {
+      position: fixed; bottom: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      border: 1px solid #445;
+      border-radius: 20px;
+      padding: 5px 18px;
+      font-size: 12px;
+      color: #9ab;
+    }
+
+    #legend {
+      position: fixed; top: 12px; right: 12px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid #334;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 2;
+    }
+    .leg-row { display: flex; align-items: center; gap: 8px; }
+    .leg-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div id="hud">
+  <div><span class="label">Tick    </span> <span class="val" id="h-tick">—</span></div>
+  <div><span class="label">Alive   </span> <span class="val" id="h-alive">—</span></div>
+  <div><span class="label">Messages</span> <span class="val" id="h-msgs">—</span></div>
+  <div><span class="label">FPS     </span> <span class="val" id="h-fps">—</span></div>
+</div>
+
+<div id="legend">
+  <div class="leg-row"><div class="leg-swatch" style="background:#5a8c3c"></div> Plain</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#2a5da0"></div> Water</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#888"></div> Rock</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#b09050"></div> Stairs</div>
+  <div class="leg-row"><div class="leg-swatch" style="background:#e8c820; border-radius:50%"></div> Resource</div>
+</div>
+
+<div id="status">Connecting to simulation…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Config — change WS_URL if your server runs elsewhere
+// ---------------------------------------------------------------------------
+// Served by terrabots-run over HTTP -> same host; opened as a file -> localhost default.
+const WS_URL = location.protocol.startsWith("http")
+  ? `ws://${location.host}/ws`
+  : "ws://localhost:8765/ws";
+
+// ---------------------------------------------------------------------------
+// Three.js bootstrap
+// ---------------------------------------------------------------------------
+import * as THREE from 'three';
+
+// Inline GLTFLoader (r128 compatible subset — loads the tank model)
+// We include only what we need to avoid a CDN path mismatch for the loader.
+// The tank GLB from Poly Pizza is loaded via fetch + parse.
+
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = false;
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f1a);
+scene.fog = new THREE.Fog(0x0a0f1a, 60, 160);
+
+// Camera — isometric-ish perspective, orbitable with mouse
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 400);
+camera.position.set(0, 50, 80);
+camera.lookAt(0, 0, 0);
+
+// Lighting — flat-shaded style: single strong directional + ambient
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xfff5e0, 1.2);
+sun.position.set(30, 60, 20);
+scene.add(sun);
+
+// Resize handler
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ---------------------------------------------------------------------------
+// Simple orbit controls (no import needed)
+// ---------------------------------------------------------------------------
+let orbitDragging = false, orbitLast = { x: 0, y: 0 };
+let orbitTheta = 0.35, orbitPhi = 1.0, orbitRadius = 90, orbitTarget = new THREE.Vector3();
+
+function applyOrbit() {
+  camera.position.set(
+    orbitTarget.x + orbitRadius * Math.sin(orbitPhi) * Math.sin(orbitTheta),
+    orbitTarget.y + orbitRadius * Math.cos(orbitPhi),
+    orbitTarget.z + orbitRadius * Math.sin(orbitPhi) * Math.cos(orbitTheta)
+  );
+  camera.lookAt(orbitTarget);
+}
+applyOrbit();
+
+renderer.domElement.addEventListener('mousedown', e => { orbitDragging = true; orbitLast = { x: e.clientX, y: e.clientY }; });
+window.addEventListener('mouseup', () => { orbitDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!orbitDragging) return;
+  orbitTheta -= (e.clientX - orbitLast.x) * 0.008;
+  orbitPhi = Math.max(0.15, Math.min(Math.PI * 0.48, orbitPhi + (e.clientY - orbitLast.y) * 0.008));
+  orbitLast = { x: e.clientX, y: e.clientY };
+  applyOrbit();
+});
+renderer.domElement.addEventListener('wheel', e => {
+  orbitRadius = Math.max(10, Math.min(200, orbitRadius + e.deltaY * 0.08));
+  applyOrbit();
+});
+
+// ---------------------------------------------------------------------------
+// Terrain colours (flat-shaded, low-poly look)
+// ---------------------------------------------------------------------------
+const TERRAIN_COLOR = {
+  PLAIN:  (elev) => {
+    // Gradient: low→dark green, high→lighter
+    const t = Math.min(elev / 6, 1);
+    return new THREE.Color().setHSL(0.30, 0.45, 0.22 + t * 0.18);
+  },
+  WATER:  (_, depth) => {
+    const t = Math.min((depth || 0.5) / 3, 1);
+    return new THREE.Color().setHSL(0.60, 0.70, 0.25 + t * 0.10);
+  },
+  ROCK:   (elev) => {
+    const t = Math.min(elev / 8, 1);
+    return new THREE.Color().setHSL(0.0, 0.0, 0.30 + t * 0.25);
+  },
+  STAIRS: () => new THREE.Color(0xb09050),
+};
+
+function terrainColor(name, elev, depth) {
+  const fn = TERRAIN_COLOR[name];
+  return fn ? fn(elev, depth) : new THREE.Color(0x888888);
+}
+
+// ---------------------------------------------------------------------------
+// Terrain mesh builder
+// ---------------------------------------------------------------------------
+let worldWidth = 0, worldHeight = 0;
+
+function buildTerrain(cells) {
+  // One quad per cell, extruded to elevation, flat-shaded
+
+  const positions = [];
+  const colors    = [];
+  const indices   = [];
+
+  const cellSize = 1.0;
+  let vi = 0;
+
+  for (const c of cells) {
+    const cx = c.x - worldWidth  / 2;
+    const cz = c.y - worldHeight / 2;
+    const h  = c.elevation;
+    const col = terrainColor(c.terrain, c.elevation, c.water_depth);
+    const r = col.r, g = col.g, b = col.b;
+
+    const x0 = cx, x1 = cx + cellSize;
+    const z0 = cz, z1 = cz + cellSize;
+
+    // Push one quad. Vertices a,b,c,d must be counter-clockwise when viewed
+    // from the side the face should be visible from (Three.js culls back faces).
+    const quad = (verts, cr, cg, cb) => {
+      positions.push(...verts);
+      for (let i = 0; i < 4; i++) colors.push(cr, cg, cb);
+      indices.push(vi, vi + 1, vi + 2,  vi, vi + 2, vi + 3);
+      vi += 4;
+    };
+
+    // Top face (normal +y)
+    quad([x0, h, z0,  x0, h, z1,  x1, h, z1,  x1, h, z0], r, g, b);
+
+    // Side skirts down to y=0 on all four sides, darker for the low-poly look.
+    // Faces hidden by taller neighbours are simply depth-occluded.
+    if (h > 0.05) {
+      const sr = r * 0.6, sg = g * 0.6, sb = b * 0.6;
+      quad([x0, 0, z0,  x0, h, z0,  x1, h, z0,  x1, 0, z0], sr, sg, sb); // -z
+      quad([x1, 0, z1,  x1, h, z1,  x0, h, z1,  x0, 0, z1], sr, sg, sb); // +z
+      quad([x1, 0, z0,  x1, h, z0,  x1, h, z1,  x1, 0, z1], sr, sg, sb); // +x
+      quad([x0, 0, z1,  x0, h, z1,  x0, h, z0,  x0, 0, z0], sr, sg, sb); // -x
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();  // for non-flat fragments; flatShading overrides per-face
+
+  const mat = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+  return mesh;
+}
+
+// ---------------------------------------------------------------------------
+// Agent meshes — simple tank-like box placeholder + optional GLB
+// ---------------------------------------------------------------------------
+
+// Palette: one hue per agent class name
+const CLASS_HUES = {};
+let hueIndex = 0;
+const HUE_STEP = 0.18;
+
+function classHue(className) {
+  if (!(className in CLASS_HUES)) {
+    CLASS_HUES[className] = (hueIndex * HUE_STEP) % 1.0;
+    hueIndex++;
+  }
+  return CLASS_HUES[className];
+}
+
+// Simple box agent mesh
+function makeAgentMesh(className) {
+  const hue = classHue(className);
+  const color = new THREE.Color().setHSL(hue, 0.75, 0.55);
+  const bodyGeo = new THREE.BoxGeometry(0.7, 0.4, 0.9);
+  const bodyMat = new THREE.MeshLambertMaterial({ color, flatShading: true });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.2;
+
+  const turretGeo = new THREE.BoxGeometry(0.4, 0.25, 0.5);
+  const turretMat = new THREE.MeshLambertMaterial({
+    color: new THREE.Color().setHSL(hue, 0.6, 0.35),
+    flatShading: true,
+  });
+  const turret = new THREE.Mesh(turretGeo, turretMat);
+  turret.position.set(0, 0.52, 0.1);
+
+  const group = new THREE.Group();
+  group.add(body);
+  group.add(turret);
+  return group;
+}
+
+// Energy bar (thin flat plane above agent)
+function makeEnergyBar() {
+  const geo = new THREE.PlaneGeometry(1, 0.12);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x44ff44, side: THREE.DoubleSide });
+  const bar = new THREE.Mesh(geo, mat);
+  bar.rotation.x = -Math.PI / 2;
+  bar.position.y = 1.0;
+  return bar;
+}
+
+// Agent pool (reuse meshes rather than create/destroy each tick)
+const agentMeshes = {};    // id → { group, bar, barMat }
+
+function updateAgents(agentList) {
+  const seen = new Set();
+
+  for (const a of agentList) {
+    seen.add(a.id);
+    if (!a.alive) {
+      if (agentMeshes[a.id]) {
+        scene.remove(agentMeshes[a.id].group);
+        delete agentMeshes[a.id];
+      }
+      continue;
+    }
+
+    if (!agentMeshes[a.id]) {
+      const group = makeAgentMesh(a.class);
+      const bar   = makeEnergyBar();
+      group.add(bar);
+      scene.add(group);
+      agentMeshes[a.id] = { group, bar, barMat: bar.material };
+    }
+
+    const entry = agentMeshes[a.id];
+    const [gx, gy] = a.pos;
+    entry.group.position.set(
+      gx - worldWidth  / 2 + 0.5,
+      a.elevation + 0.25,
+      gy - worldHeight / 2 + 0.5
+    );
+
+    // Energy bar: scale x by energy fraction (max 100 assumed)
+    const frac = Math.max(0, Math.min(1, a.energy / 100));
+    entry.bar.scale.x = frac;
+    entry.bar.position.x = -(1 - frac) * 0.5;
+    entry.barMat.color.setHSL(frac * 0.33, 0.9, 0.5);
+  }
+
+  // Remove stale entries (agents that died and were already removed above
+  // but were previously tracked)
+  for (const id of Object.keys(agentMeshes).map(Number)) {
+    if (!seen.has(id)) {
+      scene.remove(agentMeshes[id].group);
+      delete agentMeshes[id];
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Resource markers — small glowing spheres
+// ---------------------------------------------------------------------------
+
+const resourceMeshes = {};   // "x,y" → mesh
+
+const RESOURCE_GEO  = new THREE.SphereGeometry(0.25, 6, 4);
+const RESOURCE_MAT  = new THREE.MeshBasicMaterial({ color: 0xe8c820 });
+
+function updateResources(resourceDict, terrainMap) {
+  const seen = new Set(Object.keys(resourceDict));
+
+  for (const key of seen) {
+    if (!resourceMeshes[key]) {
+      const mesh = new THREE.Mesh(RESOURCE_GEO, RESOURCE_MAT.clone());
+      scene.add(mesh);
+      resourceMeshes[key] = mesh;
+    }
+    const [xs, ys] = key.split(',');
+    const x = parseInt(xs), y = parseInt(ys);
+    const elev = (terrainMap[key] ?? 0);
+    const amount = resourceDict[key];
+    resourceMeshes[key].position.set(
+      x - worldWidth  / 2 + 0.5,
+      elev + 0.4,
+      y - worldHeight / 2 + 0.5
+    );
+    // Size proportional to amount (max 50)
+    const s = 0.3 + (amount / 50) * 0.7;
+    resourceMeshes[key].scale.setScalar(s);
+  }
+
+  for (const key of Object.keys(resourceMeshes)) {
+    if (!seen.has(key)) {
+      scene.remove(resourceMeshes[key]);
+      delete resourceMeshes[key];
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket connection + message handling
+// ---------------------------------------------------------------------------
+const statusEl = document.getElementById('status');
+const hudTick  = document.getElementById('h-tick');
+const hudAlive = document.getElementById('h-alive');
+const hudMsgs  = document.getElementById('h-msgs');
+const hudFps   = document.getElementById('h-fps');
+
+let terrainElevMap = {};   // "x,y" → elevation (for resource positioning)
+
+function connect() {
+  const ws = new WebSocket(WS_URL);
+  statusEl.textContent = 'Connecting…';
+
+  ws.onopen = () => {
+    statusEl.textContent = `Connected — waiting for world state…`;
+  };
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === 'world_state') {
+      worldWidth  = msg.width;
+      worldHeight = msg.height;
+      // Center the camera on the world
+      orbitTarget.set(0, 0, 0);
+      orbitRadius = Math.max(worldWidth, worldHeight) * 0.85;
+      applyOrbit();
+
+      buildTerrain(msg.terrain);
+
+      // Build elevation lookup for resource positioning
+      for (const c of msg.terrain) {
+        terrainElevMap[`${c.x},${c.y}`] = c.elevation;
+      }
+      statusEl.textContent = `World loaded (${worldWidth}×${worldHeight}) — simulation running`;
+
+    } else if (msg.type === 'tick') {
+      hudTick.textContent  = msg.tick;
+      hudAlive.textContent = msg.n_alive;
+      hudMsgs.textContent  = msg.n_messages_sent;
+
+      updateAgents(msg.agents);
+      updateResources(msg.resources, terrainElevMap);
+    }
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = 'Disconnected — retrying in 3s…';
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => {
+    statusEl.textContent = 'Connection error';
+  };
+}
+
+connect();
+
+// ---------------------------------------------------------------------------
+// Render loop + FPS counter
+// ---------------------------------------------------------------------------
+let fpsFrames = 0, fpsLast = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+
+  fpsFrames++;
+  const now = performance.now();
+  if (now - fpsLast >= 1000) {
+    hudFps.textContent = fpsFrames;
+    fpsFrames = 0;
+    fpsLast = now;
+  }
+}
+
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terrabots"
+version = "0.1.0"
+description = "2.5D creature-survival simulation framework for learning AI, statistics, and ML"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "André Munzinger", email = "munzinger.andre@web.de" }]
+requires-python = ">=3.11"
+keywords = ["simulation", "agents", "ai", "machine-learning", "education", "robocode"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+dependencies = [
+    "numpy>=1.26",
+    "websockets>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+ml = [
+    "torch>=2.2",
+]
+
+[project.scripts]
+terrabots-run = "terrabots.run:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["terrabots*"]
+
+[tool.setuptools.package-data]
+"terrabots.viewer" = ["index.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

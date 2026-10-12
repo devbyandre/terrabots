@@ -1,5 +1,6 @@
 """
-Battle server: serves the battle viewer and runs battles the browser asks for.
+Battle server: serves the viewer and runs the battles (and survival runs) the
+browser asks for.
 
     http://<host>:<port>/      -> battle.html (setup screen, battle view, results)
     ws://<host>:<port>/ws      -> bidirectional JSON, see docs/arena-spec.md §10
@@ -9,9 +10,11 @@ speed, stop). There is one battle at a time; every connected viewer sees it and
 can control it.
 
 Client -> server: list_bots, start_battle {config, bots}, parse_toml {text},
+                  start_survival {config, agents},
                   pause, resume, step, set_speed {tick_delay_ms}, stop_battle
-Server -> client: hello {defaults, bots}, bot_list, toml_parsed, error,
-                  round_start {world, ...}, tick, round_end, battle_end, stopped
+Server -> client: hello {defaults, bots, survival}, bot_list, toml_parsed, error,
+                  round_start {world, ...}, tick, round_end, battle_end, stopped,
+                  survival_start {world, agents, config}, survival_tick, survival_end
 """
 
 from __future__ import annotations
@@ -32,6 +35,8 @@ from websockets.http11 import Request, Response
 from terrabots.battle.config import BattleConfigError, BattleFile
 from terrabots.battle.discovery import discover_bots
 from terrabots.battle.runner import BattleRunner
+from terrabots.framework.agent import Agent
+from terrabots.survival_session import SurvivalSession, SurvivalSettings, SurvivalSettingsError
 from terrabots.world_terrain import TerrainType, WorldGrid
 
 logger = logging.getLogger(__name__)
@@ -64,11 +69,13 @@ def world_payload(world: WorldGrid) -> dict[str, Any]:
 
 class BattleServer:
     def __init__(self, defaults: BattleFile, extra_specs: list[str] | None = None,
+                 extra_agents: list[str] | None = None,
                  host: str = "localhost", port: int = 8765,
                  results_dir: str = "results", time_budget_ms: float | None | str = "config",
                  autostart: bool = False) -> None:
         self.defaults = defaults
         self.extra_specs = list(extra_specs or []) + [b.spec for b in defaults.bots]
+        self.extra_agents = list(extra_agents or [])
         self.host, self.port = host, port
         self.results_dir = results_dir
         self.time_budget_ms = time_budget_ms
@@ -119,6 +126,9 @@ class BattleServer:
                 "defaults": {"config": self.defaults.config.to_dict(),
                              "bots": [{"spec": b.spec, "count": b.count} for b in self.defaults.bots]},
                 "bots": [b.to_dict() for b in discover_bots(self.extra_specs)],
+                "survival": {"defaults": SurvivalSettings().to_dict(),
+                             "agents": [b.to_dict() for b in
+                                        discover_bots(self.extra_agents, base=Agent)]},
                 "running": self._task is not None and not self._task.done(),
                 "paused": self._paused,
                 "tick_delay_ms": self._tick_delay_ms,
@@ -142,6 +152,8 @@ class BattleServer:
             await ws.send(json.dumps({"type": "bot_list", "bots": [b.to_dict() for b in bots]}))
         elif kind == "start_battle":
             await self._start(msg.get("config", {}), msg.get("bots", []))
+        elif kind == "start_survival":
+            await self._start_survival(msg.get("config", {}), msg.get("agents", []))
         elif kind == "parse_toml":
             try:
                 bf = BattleFile.from_dict(tomllib.loads(msg["text"]))
@@ -183,6 +195,26 @@ class BattleServer:
         self._tick_delay_ms = bf.config.tick_delay_ms
         self._task = asyncio.create_task(self._run(runner, bf))
 
+    async def _start_survival(self, config: dict[str, Any], agents: list[dict[str, Any]]) -> None:
+        try:
+            settings = SurvivalSettings.from_dict(config)
+            entries = []
+            for a in agents:
+                count = int(a.get("count", 0))
+                if count > 0:
+                    cls = _load_class(str(a["spec"]))
+                    if not (isinstance(cls, type) and issubclass(cls, Agent)):
+                        raise ValueError(f"{a['spec']} is not a survival Agent")
+                    entries.append((cls, count))
+            session = await asyncio.to_thread(SurvivalSession, settings, entries)
+        except (SurvivalSettingsError, ValueError, ImportError, AttributeError, RuntimeError) as exc:
+            await self._broadcast({"type": "error", "message": str(exc)})
+            return
+        await self._stop()
+        self._paused = False
+        self._tick_delay_ms = settings.tick_delay_ms
+        self._task = asyncio.create_task(self._run_survival(session, agents))
+
     async def _stop(self) -> None:
         if self._task is not None and not self._task.done():
             self._task.cancel()
@@ -202,8 +234,39 @@ class BattleServer:
                 self._connections.discard(ws)
 
     # ------------------------------------------------------------------
-    # Battle loop
+    # Loops
     # ------------------------------------------------------------------
+
+    async def _pace(self) -> None:
+        """Wait while paused (a step request lets one tick through)."""
+        if self._paused:
+            self._step_requested.clear()
+            await self._step_requested.wait()
+
+    async def _after_tick(self) -> None:
+        if self._tick_delay_ms > 0 and not self._paused:
+            await asyncio.sleep(self._tick_delay_ms / 1000)
+
+    async def _run_survival(self, session: SurvivalSession, agents: list[dict[str, Any]]) -> None:
+        try:
+            self._last_round_start = json.dumps({
+                "type": "survival_start", "world": world_payload(session.world),
+                "agents": session.agents_info(), "config": session.settings.to_dict()})
+            await self._broadcast(self._last_round_start)
+            while not session.over:
+                await self._pace()
+                frame = await asyncio.to_thread(session.step)
+                self._last_frame = json.dumps(frame)
+                await self._broadcast(self._last_frame)
+                await self._after_tick()
+            await self._broadcast({"type": "survival_end", "tick": session.tick,
+                                   "results": session.results(), "config": session.settings.to_dict(),
+                                   "agents": agents})
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("Survival run crashed")
+            await self._broadcast({"type": "error", "message": f"Survival run crashed: {exc}"})
 
     async def _run(self, runner: BattleRunner, bf: BattleFile) -> None:
         world = world_payload(runner.world)
@@ -219,14 +282,11 @@ class BattleServer:
                 await self._broadcast(self._last_round_start)
                 await self._broadcast(arena.frame())
                 while not arena.over:
-                    if self._paused:
-                        self._step_requested.clear()
-                        await self._step_requested.wait()
+                    await self._pace()
                     frame = await asyncio.to_thread(runner.step)
                     self._last_frame = json.dumps(frame)
                     await self._broadcast(self._last_frame)
-                    if self._tick_delay_ms > 0 and not self._paused:
-                        await asyncio.sleep(self._tick_delay_ms / 1000)
+                    await self._after_tick()
                 ranking = runner.end_round()
                 await self._broadcast({"type": "round_end", "round": runner.round,
                                        "rounds": bf.config.rounds, "ranking": ranking,
@@ -248,3 +308,12 @@ class BattleServer:
             await self._broadcast({"type": "error", "message": f"Battle crashed: {exc}"})
         finally:
             runner.close()
+
+
+def _load_class(spec: str) -> type:
+    import importlib
+
+    module_name, _, class_name = spec.partition(":")
+    if not class_name:
+        raise ValueError(f"{spec!r}: expected 'module:ClassName'")
+    return getattr(importlib.import_module(module_name), class_name)

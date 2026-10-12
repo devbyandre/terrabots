@@ -66,3 +66,47 @@ def test_websocket_battle_round_trip() -> None:
     seen = asyncio.run(scenario())
     assert seen[0] == "round_start"
     assert "tick" in seen and "round_end" in seen and seen[-1] == "battle_end"
+
+
+def test_websocket_survival_round_trip() -> None:
+    from websockets.asyncio.client import connect
+
+    async def scenario() -> tuple[list[str], dict]:
+        server = BattleServer(BattleFile.from_dict({}), port=8798, results_dir="/tmp/terrabots-test-results")
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0.3)
+        seen: list[str] = []
+        end: dict = {}
+        try:
+            async with connect("ws://localhost:8798/ws") as ws:
+                hello = json.loads(await ws.recv())
+                specs = {a["spec"] for a in hello["survival"]["agents"]}
+                assert "terrabots.agents.grazer:Grazer" in specs
+                await ws.send(json.dumps({
+                    "type": "start_survival",
+                    "config": {**hello["survival"]["defaults"], "size": 24, "max_ticks": 30,
+                               "tick_delay_ms": 0, "seed": 1},
+                    "agents": [{"spec": "terrabots.agents.grazer:Grazer", "count": 3}]}))
+                while "survival_end" not in seen:
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+                    seen.append(msg["type"])
+                    if msg["type"] == "survival_end":
+                        end = msg
+        finally:
+            task.cancel()
+        return seen, end
+
+    seen, end = asyncio.run(scenario())
+    assert seen[0] == "survival_start" and "survival_tick" in seen
+    assert end["tick"] == 30 and end["results"][0]["class"] == "Grazer"
+
+
+def test_survival_settings_validation() -> None:
+    import pytest
+
+    from terrabots.survival_session import SurvivalSettings, SurvivalSettingsError
+
+    with pytest.raises(SurvivalSettingsError, match="size"):
+        SurvivalSettings(size=4)
+    with pytest.raises(SurvivalSettingsError, match="foo"):
+        SurvivalSettings.from_dict({"foo": 1})

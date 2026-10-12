@@ -48,6 +48,9 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
   .dialog header { padding: 18px 22px 12px; border-bottom: 1px solid var(--line-soft); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .tabs button { border-radius: 8px; padding: 6px 16px; color: var(--muted); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
   .dialog header h1 { font-size: 20px; font-weight: 650; letter-spacing: 0.01em; }
   .dialog header h1 span { color: var(--accent); }
   .dialog header p { color: var(--muted); font-size: 13px; margin-top: 2px; }
@@ -104,15 +107,23 @@
   #hud .keys kbd { font-family: var(--mono); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--muted); }
 
   #scoreboard {
-    position: fixed; top: 12px; right: 12px; z-index: 5; width: 270px; background: var(--panel);
+    position: fixed; top: 12px; right: 12px; z-index: 5; width: 296px; background: var(--panel);
     border: 1px solid var(--line); border-radius: 10px; padding: 10px 10px 6px;
   }
   @media (max-width: 760px) { #scoreboard { top: auto; bottom: 12px; width: calc(100vw - 24px); } }
+  .sb-row .rd { width: 22px; height: 22px; padding: 2px; border-radius: 5px; color: #4a566a; background: transparent; border-color: transparent; }
+  .sb-row .rd.on { color: var(--accent); }
+  .sb-row .rd:hover { border-color: var(--line-2, #2b3a52); }
+  .sb-row .rd svg { width: 16px; height: 16px; display: block; }
   .sb-row {
-    display: grid; grid-template-columns: 10px 1fr 64px 48px; gap: 8px; align-items: center;
+    display: grid; grid-template-columns: 22px 10px 1fr 64px 48px; gap: 8px; align-items: center;
     padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px;
   }
   .sb-row:hover { background: rgba(255,255,255,0.04); }
+  .sb-row.surv { grid-template-columns: 10px 1fr 64px 48px; }
+  .sb-class { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); padding: 2px 6px; }
+  .sb-class .sw { width: 10px; height: 10px; border-radius: 2px; }
+  .sb-class .num { margin-left: auto; color: var(--text); }
   .sb-row.followed { background: rgba(242, 179, 61, 0.12); }
   .sb-row.dead { opacity: 0.42; }
   .sb-row .sw { width: 10px; height: 10px; border-radius: 2px; }
@@ -161,15 +172,15 @@
   <div class="controls">
     <button id="b-pause" title="Space">Pause</button>
     <button id="b-step" title="N">Step</button>
-    <label class="speed">Speed <input id="speed" type="range" min="0" max="200" step="5" value="30" aria-label="Tick delay"><span class="num" id="speed-v">30 ms</span></label>
-    <button id="b-radar" title="R">Radar: on</button>
+    <label class="speed">Speed <input id="speed" type="range" min="0" max="300" step="5" value="60" aria-label="Tick delay"><span class="num" id="speed-v">60 ms</span></label>
+    <button id="b-radar" title="R: all radars on / off. Per tank: the radar icons in the scoreboard">Radar: all</button>
     <button id="b-top" title="T">Top-down</button>
     <button id="b-stop">Stop</button>
   </div>
-  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radar · <kbd>T</kbd> top-down · <kbd>D</kbd> debug drawings · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
+  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radars all/none (per tank: scoreboard icons, Shift = only that one) · <kbd>T</kbd> top-down · <kbd>D</kbd> debug drawings · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
 </div>
 
-<div id="scoreboard" class="hidden"><h2>Scoreboard</h2><div id="sb-rows"></div></div>
+<div id="scoreboard" class="hidden"><h2 id="sb-title">Scoreboard</h2><div id="sb-rows"></div></div>
 <div id="banner" class="hidden"></div>
 <div id="toast" class="hidden"></div>
 <div id="status">Connecting…</div>
@@ -178,13 +189,17 @@
 <div id="setup" class="overlay hidden">
   <div class="dialog" role="dialog" aria-labelledby="setup-title">
     <header>
+      <div class="tabs" role="tablist" aria-label="Game mode">
+        <button role="tab" id="tab-battle" aria-selected="true">Battle</button>
+        <button role="tab" id="tab-survival" aria-selected="false">Survival</button>
+      </div>
       <h1 id="setup-title">Terra<span>bots</span> battle setup</h1>
-      <p>Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.</p>
+      <p id="setup-sub">Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.</p>
     </header>
     <div class="body">
       <div class="setup-grid">
         <section>
-          <h2>Bots</h2>
+          <h2 id="bots-title">Bots</h2>
           <div id="bot-list"></div>
           <div class="add-spec">
             <input id="add-spec" type="text" placeholder="module:ClassName (e.g. mypackage.bots:MyTank)" aria-label="Add bot by spec">
@@ -287,21 +302,61 @@ const FIELDS = [
   ]],
 ];
 
+const SURVIVAL_FIELDS = [
+  ['World', [
+    ['size', 'Size (cells)', 'int', 'Square world, 16–256 cells per side.'],
+    ['terrain', 'Terrain', ['procedural', 'flat'], 'procedural = hills, lakes, rock; flat = no terrain.'],
+    ['seed', 'Seed', 'int?', 'Same seed → same world and spawns. Empty = random.'],
+    ['max_ticks', 'Max ticks', 'int', 'The run ends here, or earlier when everyone has died.'],
+    ['tick_delay_ms', 'Tick delay (ms)', 'int', 'Playback speed.'],
+  ]],
+  ['Creatures', [
+    ['initial_energy', 'Initial energy', 'float', 'Energy every creature starts with.'],
+    ['metabolism_per_tick', 'Metabolism / tick', 'float', 'Energy every creature loses each tick.'],
+  ]],
+  ['Food', [
+    ['initial_density', 'Initial density', 'float', 'Fraction of plain cells that start with food (0–1).'],
+    ['max_per_cell', 'Max per cell', 'float', 'Most food one cell can hold.'],
+    ['regen_rate', 'Regrowth / tick', 'float', 'Food added per tick to every cell that has some.'],
+    ['spawn_rate', 'New cells / tick', 'float', 'Expected new food cells per tick (0.3 = one every ~3 ticks).'],
+    ['forage_amount', 'Bite size', 'float', 'Energy gained per tick standing on food.'],
+    ['forage_cost', 'Bite cost', 'float', 'Energy eating costs per tick.'],
+  ]],
+];
+
 // ===========================================================================
 // State
 // ===========================================================================
 let ws = null;
 let availableBots = [];       // [{spec, name, doc, source}]
 let counts = {};              // spec -> count
+let setupMode = 'battle';     // which tab the setup screen shows
+let survAgents = [];          // survival agents, same shape as availableBots
+let survCounts = {};
+let battleDraft = null, survDraft = null;   // form values per tab
+let mode = 'battle';          // what the 3D view is showing
 let lastConfig = null;        // config dict last shown in the form
 let battleBots = [];          // [{id, name, class}] for the current battle
 let battleConfig = null;
 let paused = false;
-let showRadar = true;
-const radarOff = new Set();   // bot ids with radar hidden individually
+// Radar wedges are shown per bot. Hidden bots are remembered by name, so the
+// choice survives new rounds and battles (ids can change between battles).
+const radarHidden = new Set(JSON.parse(safeGet('terrabots.radarHidden') || '[]'));
+function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function saveRadarChoice() { try { localStorage.setItem('terrabots.radarHidden', JSON.stringify([...radarHidden])); } catch {} }
+const botName = (id) => tanks.get(id)?.name ?? '';
+const radarShown = (id) => !radarHidden.has(botName(id));
+function setRadar(id, on) { on ? radarHidden.delete(botName(id)) : radarHidden.add(botName(id)); saveRadarChoice(); updateRadarButton(); }
+function radarOnly(id) { radarHidden.clear(); for (const t of tanks.values()) if (t.id !== id) radarHidden.add(t.name); saveRadarChoice(); updateRadarButton(); }
+function updateRadarButton() {
+  const all = [...tanks.values()], shown = all.filter(t => !radarHidden.has(t.name)).length;
+  $('b-radar').textContent = `Radar: ${shown === all.length ? 'all' : shown === 0 ? 'none' : `${shown} of ${all.length}`}`;
+}
 let followId = null;
 let topDown = false;
 let lastStart = null;         // {config, bots} for "Run again"
+let lastFrame = null;
+let survivalConfig = null;
 
 function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 
@@ -316,7 +371,7 @@ function toast(text) {
 function renderSettings(config) {
   lastConfig = config;
   const root = $('settings'); root.innerHTML = '<h2>Settings</h2>';
-  for (const [group, fields] of FIELDS) {
+  for (const [group, fields] of (setupMode === 'battle' ? FIELDS : SURVIVAL_FIELDS)) {
     const fs = document.createElement('fieldset');
     fs.innerHTML = `<legend>${group}</legend><div class="fields"></div>`;
     const box = fs.querySelector('.fields');
@@ -360,31 +415,58 @@ function readSettings() {
 
 function renderBots() {
   const list = $('bot-list'); list.innerHTML = '';
-  const groups = { yours: 'Your bots (bots/)', extra: 'Extra bots', 'built-in': 'Built-in demo bots' };
+  const battle = setupMode === 'battle';
+  const pool = battle ? availableBots : survAgents, cnt = battle ? counts : survCounts;
+  const noun = battle ? 'bot' : 'agent';
+  const groups = { yours: `Your ${noun}s (bots/)`, extra: `Extra ${noun}s`, 'built-in': `Built-in demo ${noun}s` };
   for (const [src, title] of Object.entries(groups)) {
-    const bots = availableBots.filter(b => b.source === src);
+    const bots = pool.filter(b => b.source === src);
     if (!bots.length) continue;
     const g = document.createElement('div'); g.className = 'bot-group';
     g.innerHTML = `<h2>${title}</h2>`;
     for (const b of bots) {
-      const n = counts[b.spec] || 0;
+      const n = cnt[b.spec] || 0;
       const row = document.createElement('div');
       row.className = 'bot-row' + (n ? ' active' : '');
       row.innerHTML = `<div><div class="bot-name">${b.name}</div><div class="bot-doc">${b.doc || ''}</div><div class="bot-spec">${b.spec}</div></div>
         <div class="counter"><button aria-label="Fewer ${b.name}">−</button><span class="num">${n}</span><button aria-label="More ${b.name}">+</button></div>`;
       const [minus, plus] = row.querySelectorAll('button');
-      minus.onclick = () => { counts[b.spec] = Math.max(0, n - 1); renderBots(); };
-      plus.onclick = () => { counts[b.spec] = Math.min(50, n + 1); renderBots(); };
+      minus.onclick = () => { cnt[b.spec] = Math.max(0, n - 1); renderBots(); };
+      plus.onclick = () => { cnt[b.spec] = Math.min(50, n + 1); renderBots(); };
       g.appendChild(row);
     }
     list.appendChild(g);
   }
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  $('setup-summary').textContent = `${total} bot${total === 1 ? '' : 's'} selected`;
-  $('b-start').disabled = total < 2;
+  const total = Object.values(cnt).reduce((a, b) => a + b, 0);
+  $('setup-summary').textContent = `${total} ${noun}${total === 1 ? '' : 's'} selected`;
+  $('b-start').disabled = total < (battle ? 2 : 1);
 }
 
+function setSetupMode(m) {
+  if (m === setupMode) return;
+  if ($('settings').querySelector('.field')) {
+    if (setupMode === 'battle') battleDraft = readSettings(); else survDraft = readSettings();
+  }
+  setupMode = m;
+  const battle = m === 'battle';
+  $('tab-battle').setAttribute('aria-selected', String(battle));
+  $('tab-survival').setAttribute('aria-selected', String(!battle));
+  $('setup-title').innerHTML = `Terra<span>bots</span> ${battle ? 'battle' : 'survival'} setup`;
+  $('setup-sub').textContent = battle
+    ? 'Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.'
+    : 'Creatures forage food, pay metabolism and die at zero energy. Pick agents, tune the world, start.';
+  $('bots-title').textContent = battle ? 'Bots' : 'Agents';
+  $('b-start').textContent = battle ? 'Start battle' : 'Start survival';
+  for (const id of ['b-load', 'b-save']) $(id).classList.toggle('hidden', !battle);
+  renderSettings(battle ? battleDraft : survDraft);
+  renderBots();
+}
+$('tab-battle').onclick = () => setSetupMode('battle');
+$('tab-survival').onclick = () => setSetupMode('survival');
+
 function applyBattleFile(config, bots) {
+  battleDraft = config;
+  if (setupMode !== 'battle') { setSetupMode('battle'); }
   renderSettings(config);
   counts = {};
   for (const b of bots) {
@@ -396,8 +478,8 @@ function applyBattleFile(config, bots) {
   renderBots();
 }
 
-function selectedBots() {
-  return Object.entries(counts).filter(([, n]) => n > 0).map(([spec, count]) => ({ spec, count }));
+function selectedBots(cnt = counts) {
+  return Object.entries(cnt).filter(([, n]) => n > 0).map(([spec, count]) => ({ spec, count }));
 }
 
 function toToml(config, bots) {
@@ -414,8 +496,13 @@ function showSetup() {
 }
 
 $('b-start').onclick = () => {
-  lastStart = { config: readSettings(), bots: selectedBots() };
-  send({ type: 'start_battle', ...lastStart });
+  if (setupMode === 'survival') {
+    lastStart = { mode: 'survival', config: readSettings(), agents: selectedBots(survCounts) };
+    send({ type: 'start_survival', config: lastStart.config, agents: lastStart.agents });
+  } else {
+    lastStart = { mode: 'battle', config: readSettings(), bots: selectedBots() };
+    send({ type: 'start_battle', config: lastStart.config, bots: lastStart.bots });
+  }
 };
 $('b-save').onclick = () => {
   const blob = new Blob([toToml(readSettings(), selectedBots())], { type: 'text/plain' });
@@ -431,11 +518,17 @@ $('toml-file').onchange = async (e) => {
 $('b-add-spec').onclick = () => {
   const spec = $('add-spec').value.trim();
   if (!/^[\w.]+:\w+$/.test(spec)) { toast('Spec must look like module:ClassName'); return; }
-  if (!availableBots.some(b => b.spec === spec)) availableBots.push({ spec, name: spec.split(':')[1], doc: 'added by spec, checked when the battle starts', source: 'extra' });
-  counts[spec] = (counts[spec] || 0) + 1; $('add-spec').value = ''; renderBots();
+  const pool = setupMode === 'battle' ? availableBots : survAgents;
+  const cnt = setupMode === 'battle' ? counts : survCounts;
+  if (!pool.some(b => b.spec === spec)) pool.push({ spec, name: spec.split(':')[1], doc: 'added by spec, checked on start', source: 'extra' });
+  cnt[spec] = (cnt[spec] || 0) + 1; $('add-spec').value = ''; renderBots();
 };
-$('b-setup').onclick = showSetup;
-$('b-again').onclick = () => { if (lastStart) send({ type: 'start_battle', ...lastStart }); };
+$('b-setup').onclick = () => { setSetupMode(mode); showSetup(); };
+$('b-again').onclick = () => {
+  if (!lastStart) return;
+  if (lastStart.mode === 'survival') send({ type: 'start_survival', config: lastStart.config, agents: lastStart.agents });
+  else send({ type: 'start_battle', config: lastStart.config, bots: lastStart.bots });
+};
 
 // ===========================================================================
 // Three.js scene
@@ -578,11 +671,86 @@ function makeTank(bot) {
   const tag = document.createElement('div'); tag.className = 'tag';
   tag.innerHTML = `<div class="n" style="color:#${color.getHexString()}">${bot.name}</div><div class="bar"><i></i></div><div class="bar heat"><i></i></div>`;
   $('labels').appendChild(tag);
-  return { root, hull, turret, radar, color, tag, wedges: [], state: 'alive', data: null };
+  return { id: bot.id, name: bot.name, root, hull, turret, radar, color, tag, wedges: [], state: 'alive', data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Survival: creatures (one colour per class) and food
+// ---------------------------------------------------------------------------
+const creatures = new Map();      // id -> {root, tag, color, data, name, cls}
+const foodMeshes = new Map();     // "x,y" -> mesh
+const FOOD_GEO = new THREE.IcosahedronGeometry(0.22, 0);
+const FOOD_MAT = new THREE.MeshLambertMaterial({ color: 0xe8c820, emissive: 0x3a2e00, flatShading: true });
+const classColors = new Map();
+function classColor(cls) {
+  if (!classColors.has(cls)) classColors.set(cls, new THREE.Color().setHSL((classColors.size * 0.31 + 0.55) % 1, 0.7, 0.58));
+  return classColors.get(cls);
+}
+
+function makeCreature(a) {
+  const color = classColor(a.class);
+  const root = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0),
+                              new THREE.MeshLambertMaterial({ color, flatShading: true }));
+  body.position.y = 0.34; body.scale.set(1, 0.8, 1.15);
+  root.add(body);
+  root.traverse(o => { if (o.isMesh) o.userData.botId = a.id; });
+  scene.add(root);
+  const tag = document.createElement('div'); tag.className = 'tag';
+  tag.innerHTML = `<div class="n" style="color:#${color.getHexString()}">${a.name}</div><div class="bar"><i></i></div>`;
+  $('labels').appendChild(tag);
+  return { id: a.id, name: a.name, cls: a.class, root, body, tag, color, data: null, state: 'alive' };
+}
+
+function updateSurvival(frame) {
+  for (const a of frame.agents) {
+    const c = creatures.get(a.id); if (!c) continue;
+    c.data = { x: a.x + 0.5, y: a.y + 0.5, z: a.z, energy: a.energy };
+    c.root.position.copy(toScene(c.data.x, c.data.y, a.z));
+    const fr = Math.max(0, Math.min(1, a.energy / (survivalConfig?.initial_energy || 100)));
+    const bar = c.tag.querySelector('.bar > i');
+    bar.style.width = `${fr * 100}%`; bar.style.background = `hsl(${fr * 120}, 70%, 50%)`;
+    if (!a.alive && c.state !== 'dead') {
+      c.body.material = c.body.material.clone(); c.body.material.color.setHex(0x2a2d33);
+      c.root.scale.setScalar(0.7); c.tag.classList.add('hidden');
+    }
+    c.state = a.alive ? 'alive' : 'dead';
+  }
+  const seen = new Set();
+  for (const [x, y, amount] of frame.resources) {
+    const key = `${x},${y}`; seen.add(key);
+    let m = foodMeshes.get(key);
+    if (!m) { m = new THREE.Mesh(FOOD_GEO, FOOD_MAT); scene.add(m); foodMeshes.set(key, m); }
+    m.position.copy(toScene(x + 0.5, y + 0.5, groundAt(x + 0.5, y + 0.5) + 0.3));
+    m.scale.setScalar(0.6 + Math.min(1, amount / (survivalConfig?.max_per_cell || 50)) * 0.9);
+  }
+  for (const [key, m] of foodMeshes) if (!seen.has(key)) { scene.remove(m); foodMeshes.delete(key); }
+}
+
+function renderSurvivalBoard(frame) {
+  const byClass = new Map();
+  for (const a of frame.agents) {
+    const r = byClass.get(a.class) || { alive: 0, n: 0 };
+    r.n++; r.alive += a.alive ? 1 : 0; byClass.set(a.class, r);
+  }
+  const summary = [...byClass].map(([cls, r]) =>
+    `<div class="sb-class"><span class="sw" style="background:#${classColor(cls).getHexString()}"></span>${cls}<span class="num">${r.alive}/${r.n} alive</span></div>`).join('');
+  const rows = [...frame.agents].sort((a, b) => (b.alive - a.alive) || (b.energy - a.energy)).map(a => {
+    const fr = Math.max(0, Math.min(1, a.energy / (survivalConfig?.initial_energy || 100)));
+    return `<div class="sb-row surv${a.alive ? '' : ' dead'}${followId === a.id ? ' followed' : ''}" data-id="${a.id}">
+      <span class="sw" style="background:#${classColor(a.class).getHexString()}"></span><span class="nm" title="${a.name}">${a.name}</span>
+      <span class="bar"><i style="width:${fr * 100}%;background:hsl(${fr * 120},70%,50%)"></i></span>
+      <span class="sc num">${Math.round(a.energy)}</span></div>`;
+  }).join('');
+  $('sb-rows').innerHTML = summary + rows;
 }
 
 function clearBattle() {
   clearDrawings();
+  for (const c of creatures.values()) { scene.remove(c.root); c.tag.remove(); }
+  creatures.clear();
+  for (const m of foodMeshes.values()) scene.remove(m);
+  foodMeshes.clear();
   for (const t of tanks.values()) {
     scene.remove(t.root); t.tag.remove();
     for (const w of t.wedges) { scene.remove(w); w.geometry.dispose(); }
@@ -644,7 +812,7 @@ function updateTanks(frame) {
       burst(bot.x, bot.y, bot.z + 0.4, 0xff8a3d, 1.6, 0.7);
     }
     t.state = bot.state;
-    const radarVisible = showRadar && bot.state === 'alive' && !radarOff.has(bot.id);
+    const radarVisible = bot.state === 'alive' && radarShown(bot.id);
     if (radarVisible) radarWedge(t, bot);
     else if (t.wedges.length) { for (const w of t.wedges) { scene.remove(w); w.geometry.dispose(); } t.wedges = []; }
   }
@@ -702,7 +870,7 @@ function handleEvents(frame) {
     if (e.type === 'bullet_hit') burst(e.x, e.y, e.z, 0xffd166, 0.9, 0.35);
     else if (e.type === 'bullet_hit_bullet') burst(e.x, e.y, e.z, 0xffffff, 0.6, 0.3);
     else if (e.type === 'bullet_missed' && e.reason === 'terrain') burst(e.x, e.y, Math.max(e.z - 0.2, groundAt(e.x, e.y)), 0x9aa3ad, 0.5, 0.5);
-    else if (e.type === 'scan' && showRadar && !radarOff.has(e.bot)) scanLine(e.bot, e.target);
+    else if (e.type === 'scan' && radarShown(e.bot)) scanLine(e.bot, e.target);
   }
 }
 
@@ -769,13 +937,23 @@ function renderScoreboard(frame) {
   $('sb-rows').innerHTML = rows.map(b => {
     const c = tanks.get(b.id)?.color.getHexString() || 'fff';
     const fr = Math.max(0, Math.min(1, b.energy / (battleConfig?.initial_energy || 100)));
+    const on = radarShown(b.id);
     return `<div class="sb-row${b.state === 'dead' ? ' dead' : ''}${followId === b.id ? ' followed' : ''}" data-id="${b.id}">
+      <button class="rd${on ? ' on' : ''}" data-radar="${b.id}" title="Radar wedge ${on ? 'shown' : 'hidden'}. Click: toggle · Shift+click: only this one" aria-label="Toggle radar of ${b.name}" aria-pressed="${on}">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8 L14 4 A7 7 0 0 1 14 12 Z" fill="currentColor" opacity=".55"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg></button>
       <span class="sw" style="background:#${c}"></span><span class="nm" title="${b.name}">${b.name}</span>
       <span class="bar"><i style="width:${fr * 100}%;background:hsl(${fr * 120},70%,50%)"></i></span>
       <span class="sc num">${Math.round(b.total)}</span></div>`;
   }).join('');
 }
 $('sb-rows').addEventListener('click', (e) => {
+  const rd = e.target.closest('[data-radar]');
+  if (rd) {
+    const id = Number(rd.dataset.radar);
+    e.shiftKey ? radarOnly(id) : setRadar(id, !radarShown(id));
+    if (lastFrame && mode === 'battle') renderScoreboard(lastFrame);
+    return;
+  }
   const row = e.target.closest('.sb-row'); if (!row) return;
   const id = Number(row.dataset.id);
   followId = followId === id ? null : id;
@@ -790,6 +968,13 @@ function placeLabels() {
     t.tag.style.display = visible ? '' : 'none';
     t.tag.style.left = `${p.x * half.x + half.x}px`;
     t.tag.style.top = `${-p.y * half.y + half.y}px`;
+  }
+  for (const c of creatures.values()) {
+    if (!c.data || c.state === 'dead') continue;
+    const p = toScene(c.data.x, c.data.y, c.data.z + 1.0).project(camera);
+    c.tag.style.display = p.z < 1 ? '' : 'none';
+    c.tag.style.left = `${p.x * half.x + half.x}px`;
+    c.tag.style.top = `${-p.y * half.y + half.y}px`;
   }
   for (const t of drawTexts) {
     const p = t.pos.clone().project(camera);
@@ -811,7 +996,12 @@ $('speed').oninput = (e) => { $('speed-v').textContent = `${e.target.value} ms`;
 $('b-radar').onclick = () => toggleRadar();
 $('b-top').onclick = () => toggleTopDown();
 
-function toggleRadar() { showRadar = !showRadar; $('b-radar').textContent = `Radar: ${showRadar ? 'on' : 'off'}`; }
+// All on -> all off; anything else -> all on.
+function toggleRadar() {
+  const anyShown = [...tanks.values()].some(t => !radarHidden.has(t.name));
+  for (const t of tanks.values()) anyShown ? radarHidden.add(t.name) : radarHidden.delete(t.name);
+  saveRadarChoice(); updateRadarButton();
+}
 function toggleTopDown() {
   topDown = !topDown;
   // Distance at which the whole arena fits the vertical field of view, plus margin.
@@ -841,10 +1031,10 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
   const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
-  const hit = raycaster.intersectObjects([...tanks.values()].map(t => t.root), true)[0];
+  const hit = raycaster.intersectObjects([...tanks.values(), ...creatures.values()].map(t => t.root), true)[0];
   if (!hit) return;
   const id = hit.object.userData.botId;
-  if (followId === id) { radarOff.has(id) ? radarOff.delete(id) : radarOff.add(id); }
+  if (followId === id && mode === 'battle') setRadar(id, !radarShown(id));
   else followId = id;
 });
 
@@ -856,7 +1046,24 @@ const RESULT_COLS = [['rank', '#'], ['name', 'Bot'], ['total', 'Total'], ['survi
   ['ram_damage', 'Ram dmg'], ['ram_kill_bonus', 'Ram bonus'], ['firsts', '1st'], ['seconds', '2nd'],
   ['thirds', '3rd'], ['hit_rate', 'Hits'], ['avg_end_energy', 'End energy'], ['skipped_turns', 'Skipped']];
 
+const SURVIVAL_COLS = [['rank', '#'], ['class', 'Agent'], ['alive', 'Alive'], ['count', 'Of'],
+  ['avg_lifetime', 'Avg lifetime (ticks)'], ['avg_end_energy', 'Avg end energy']];
+
+function showSurvivalResults(msg) {
+  $('results-title').textContent = 'Survival results';
+  $('results-table').innerHTML =
+    `<thead><tr>${SURVIVAL_COLS.map(([, h]) => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
+    msg.results.map(r => `<tr>${SURVIVAL_COLS.map(([k]) => `<td class="${k === 'class' ? '' : 'num'}">${r[k]}</td>`).join('')}</tr>`).join('') +
+    '</tbody>';
+  const c = msg.config;
+  $('results-sub').textContent = `Ended at tick ${msg.tick} · ${c.size}×${c.size} ${c.terrain} · seed ${c.seed ?? 'random'}`;
+  $('results-saved').textContent = '';
+  lastStart = { mode: 'survival', config: msg.config, agents: msg.agents };
+  $('results').classList.remove('hidden');
+}
+
 function showResults(msg) {
+  $('results-title').textContent = 'Battle results';
   const fmt = (k, v) => k === 'hit_rate' ? `${(v * 100).toFixed(1)}%` : typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(1) : v;
   $('results-table').innerHTML =
     `<thead><tr>${RESULT_COLS.map(([, h]) => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
@@ -865,7 +1072,7 @@ function showResults(msg) {
   const c = msg.config;
   $('results-sub').textContent = `${c.rounds} rounds · ${c.width}×${c.height} ${c.terrain} · seed ${c.seed ?? 'random'} · energy return: ${c.hit_energy_return}`;
   $('results-saved').textContent = msg.saved_to ? `Saved to ${msg.saved_to}` : '';
-  lastStart = { config: msg.config, bots: msg.bots };
+  lastStart = { mode: 'battle', config: msg.config, bots: msg.bots };
   $('results').classList.remove('hidden');
 }
 
@@ -881,8 +1088,12 @@ function connect() {
     switch (msg.type) {
       case 'hello':
         availableBots = msg.bots;
+        survAgents = msg.survival.agents;
+        survDraft = msg.survival.defaults;
+        survCounts = {};
+        for (const a of survAgents.slice(0, 3)) survCounts[a.spec] = 5;
         applyBattleFile(msg.defaults.config, msg.defaults.bots);
-        lastStart = { config: msg.defaults.config, bots: msg.defaults.bots };
+        lastStart = { mode: 'battle', config: msg.defaults.config, bots: msg.defaults.bots };
         $('speed').value = msg.tick_delay_ms; $('speed-v').textContent = `${msg.tick_delay_ms} ms`;
         setPaused(msg.paused);
         if (!msg.running) showSetup();
@@ -891,7 +1102,34 @@ function connect() {
       case 'toml_parsed': applyBattleFile(msg.config, msg.bots); break;
       case 'error': toast(msg.message); break;
       case 'paused': setPaused(msg.paused); break;
+      case 'survival_start': {
+        mode = 'survival';
+        $('setup').classList.add('hidden'); $('results').classList.add('hidden');
+        $('hud').classList.remove('hidden'); $('scoreboard').classList.remove('hidden');
+        $('b-radar').classList.add('hidden'); $('h-inactive').classList.add('hidden');
+        $('sb-title').textContent = 'Creatures';
+        survivalConfig = msg.config; battleConfig = null;
+        clearBattle();
+        buildTerrain(msg.world);
+        for (const a of msg.agents) creatures.set(a.id, makeCreature(a));
+        followId = null; resetCamera();
+        $('h-round').textContent = 'Survival';
+        $('speed').value = msg.config.tick_delay_ms; $('speed-v').textContent = `${msg.config.tick_delay_ms} ms`;
+        banner('Survival <small>forage or starve</small>', 1000);
+        break;
+      }
+      case 'survival_tick':
+        $('h-tick').textContent = `tick ${msg.tick} · ${msg.n_alive} alive`;
+        lastFrame = msg;
+        updateSurvival(msg); renderSurvivalBoard(msg);
+        break;
+      case 'survival_end':
+        banner(`Survival over <small>tick ${msg.tick}</small>`, 1200);
+        setTimeout(() => showSurvivalResults(msg), 900);
+        break;
       case 'round_start': {
+        mode = 'battle';
+        $('b-radar').classList.remove('hidden'); $('sb-title').textContent = 'Scoreboard';
         $('setup').classList.add('hidden'); $('results').classList.add('hidden');
         $('hud').classList.remove('hidden'); $('scoreboard').classList.remove('hidden');
         const firstRound = msg.round === 1 || !terrainMesh;
@@ -899,6 +1137,7 @@ function connect() {
         clearBattle();
         buildTerrain(msg.world);
         for (const b of msg.bots) tanks.set(b.id, makeTank(b));
+        updateRadarButton();
         if (firstRound) { followId = null; resetCamera(); }
         $('h-round').textContent = `Round ${msg.round} / ${msg.rounds}`;
         $('speed').value = msg.config.tick_delay_ms; $('speed-v').textContent = `${msg.config.tick_delay_ms} ms`;
@@ -907,6 +1146,7 @@ function connect() {
       }
       case 'tick':
         $('h-tick').textContent = `tick ${msg.tick}`;
+        lastFrame = msg;
         updateTanks(msg); updateBullets(msg); handleEvents(msg); renderScoreboard(msg); renderDrawings(msg);
         $('h-inactive').classList.toggle('hidden', !msg.inactive);
         break;
@@ -934,7 +1174,7 @@ function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   if (followId !== null) {
-    const d = tanks.get(followId)?.data;
+    const d = tanks.get(followId)?.data || creatures.get(followId)?.data;
     if (d) {
       const target = toScene(d.x, d.y, d.z);
       const delta = target.clone().sub(controls.target).multiplyScalar(0.12);

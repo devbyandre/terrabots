@@ -86,7 +86,7 @@ class BattleConfig:
     # --- Rounds ---
     rounds: int = 10
     max_ticks_per_round: int = 2000
-    tick_delay_ms: int = 30              # viewer playback only
+    tick_delay_ms: int = 60              # viewer playback only (~16 ticks/s)
 
     # --- Bodies ---
     initial_energy: float = 100.0

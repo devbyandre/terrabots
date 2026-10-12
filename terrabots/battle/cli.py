@@ -39,6 +39,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
                    help="bot to fight, repeatable; replaces the file's bots")
     p.add_argument("--extra-bot", action="append", default=[], metavar="MODULE:CLASS",
                    help="viewer: list this bot in the setup screen (e.g. from an installed package)")
+    p.add_argument("--extra-agent", action="append", default=[], metavar="MODULE:CLASS",
+                   help="viewer: list this survival agent in the Survival tab")
     p.add_argument("--rounds", type=int, help="override number of rounds")
     p.add_argument("--seed", type=int, help="override seed")
     p.add_argument("--isolation", choices=["none", "process"],
@@ -98,7 +100,8 @@ def main(argv: list[str] | None = None) -> None:
 
     from terrabots.viewer.battle_server import BattleServer
 
-    server = BattleServer(bf, extra_specs=args.extra_bot, host=args.host, port=args.port,
+    server = BattleServer(bf, extra_specs=args.extra_bot, extra_agents=args.extra_agent,
+                          host=args.host, port=args.port,
                           results_dir=args.results_dir, time_budget_ms=budget,
                           autostart=args.autostart)
     try:

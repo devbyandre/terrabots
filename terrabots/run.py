@@ -33,7 +33,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--host",     type=str,   default="localhost", help="WebSocket host (default localhost)")
     p.add_argument("--port",     type=int,   default=8765,  help="WebSocket port (default 8765)")
     p.add_argument("--headless", action="store_true",       help="Run without viewer WebSocket server")
-    p.add_argument("--speed",    type=float, default=0.05,  help="Seconds between ticks when viewer is on (default 0.05)")
+    p.add_argument("--speed",    type=float, default=0.06,  help="Seconds between ticks when viewer is on (default 0.06)")
     p.add_argument("--seed",     type=int,   default=None,  help="Random seed for reproducibility")
     p.add_argument("--verbose",  action="store_true",       help="Print tick stats to stdout")
     p.add_argument("--log",      type=str,   default="WARNING",

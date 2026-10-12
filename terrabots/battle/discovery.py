@@ -2,7 +2,7 @@
 Find battle bots for the setup screen.
 
 Scans ./bots/*.py (your bots) and terrabots/agents/*.py (built-in demo bots) for
-BattleAgent subclasses defined in those files. Extra specs (e.g. a bot from an
+BattleAgent subclasses (battle) or Agent subclasses (survival) defined in those files. Extra specs (e.g. a bot from an
 installed package, `mypackage.bots:MyTank`) can be added explicitly.
 
 Importing a file runs its code, so this has the same trust caveat as running
@@ -42,7 +42,7 @@ def _first_doc_line(cls: type) -> str:
     return doc.splitlines()[0] if doc else ""
 
 
-def _bots_in_module(module_name: str, source: str) -> list[BotInfo]:
+def _bots_in_module(module_name: str, source: str, base: type) -> list[BotInfo]:
     try:
         module = importlib.import_module(module_name)
     except Exception as exc:  # a broken user bot must not break the setup screen
@@ -50,7 +50,7 @@ def _bots_in_module(module_name: str, source: str) -> list[BotInfo]:
         return []
     found = []
     for _, cls in inspect.getmembers(module, inspect.isclass):
-        if (issubclass(cls, BattleAgent) and cls is not BattleAgent
+        if (issubclass(cls, base) and cls is not base
                 and cls.__module__ == module_name and not inspect.isabstract(cls)):
             found.append(BotInfo(f"{module_name}:{cls.__name__}", cls.__name__,
                                  _first_doc_line(cls), source))
@@ -58,7 +58,8 @@ def _bots_in_module(module_name: str, source: str) -> list[BotInfo]:
 
 
 def discover_bots(extra_specs: list[str] | None = None,
-                  user_dir: str | Path = "bots") -> list[BotInfo]:
+                  user_dir: str | Path = "bots", base: type = BattleAgent) -> list[BotInfo]:
+    """Battle bots by default; pass base=Agent for survival agents."""
     if os.getcwd() not in sys.path:
         sys.path.insert(0, os.getcwd())
 
@@ -67,10 +68,10 @@ def discover_bots(extra_specs: list[str] | None = None,
     if user_dir.is_dir():
         for path in sorted(user_dir.glob("*.py")):
             if path.stem != "__init__":
-                bots += _bots_in_module(f"{user_dir.name}.{path.stem}", "yours")
+                bots += _bots_in_module(f"{user_dir.name}.{path.stem}", "yours", base)
     for path in sorted(_BUILTIN_DIR.glob("*.py")):
         if path.stem != "__init__":
-            bots += _bots_in_module(f"terrabots.agents.{path.stem}", "built-in")
+            bots += _bots_in_module(f"terrabots.agents.{path.stem}", "built-in", base)
 
     known = {b.spec for b in bots}
     for spec in extra_specs or []:
@@ -82,7 +83,7 @@ def discover_bots(extra_specs: list[str] | None = None,
         except Exception as exc:
             logger.warning("Skipping bot %s: %s", spec, exc)
             continue
-        if isinstance(cls, type) and issubclass(cls, BattleAgent):
+        if isinstance(cls, type) and issubclass(cls, base):
             bots.append(BotInfo(spec, class_name, _first_doc_line(cls), "extra"))
             known.add(spec)
     return bots

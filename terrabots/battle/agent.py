@@ -24,6 +24,9 @@ Design notes:
   settings): bullet_speed(power), damage(power), gun_cooling_rate, max_velocity...
   It's a copy; changing it changes nothing.
 - `draw` is a DebugCanvas for graphical debugging (Robocode's onPaint).
+- `colors` (Robocode's setColors): CSS colours for "body", "gun", "radar",
+  "bullet" and "scan" (the radar wedge). Set them in on_round_start(); any
+  left out use the bot's default colour.
 """
 
 from __future__ import annotations
@@ -51,6 +54,7 @@ class BattleAgent(abc.ABC):
         self.memory: dict[str, Any] = {}    # replaced by the per-class battle memory
         self.rules: BattleConfig = BattleConfig()   # replaced by the battle's rules
         self.draw = DebugCanvas()
+        self.colors: dict[str, str] = {}
 
     def on_round_start(self, round_number: int, rounds: int) -> None:
         """Called once per round after bot_id, name and memory are set."""

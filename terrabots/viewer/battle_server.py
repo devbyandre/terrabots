@@ -276,7 +276,8 @@ class BattleServer:
                 self._last_round_start = json.dumps({
                     "type": "round_start", "round": runner.round, "rounds": bf.config.rounds,
                     "world": world, "config": bf.config.to_dict(),
-                    "bots": [{"id": bid, "name": name, "class": cls.__name__}
+                    "bots": [{"id": bid, "name": name, "class": cls.__name__,
+                              "colors": dict(arena.slots[bid].agent.colors)}
                              for bid, (cls, name) in enumerate(runner.names)],
                 })
                 await self._broadcast(self._last_round_start)

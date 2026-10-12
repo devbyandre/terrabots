@@ -237,6 +237,13 @@ class AdvancedRobot(BattleAgent):
     def set_adjust_radar_for_gun_turn(self, independent: bool) -> None:
         self.adjust_radar_for_gun_turn = independent
 
+    def set_colors(self, body: str | None = None, gun: str | None = None, radar: str | None = None,
+                   bullet: str | None = None, scan: str | None = None) -> None:
+        """Robocode's setColors / setBodyColor & co. (CSS colours, e.g. "#404040")."""
+        for part, c in (("body", body), ("gun", gun), ("radar", radar), ("bullet", bullet), ("scan", scan)):
+            if c is not None:
+                self.colors[part] = c
+
     def set_fire(self, power: float) -> Bullet | None:
         """Fire this tick if the gun is cool; returns the Bullet (Robocode setFireBullet)."""
         if self.gun_heat > 0 or power <= 0 or self.energy <= 0:

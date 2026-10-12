@@ -633,9 +633,20 @@ const tanks = new Map();   // id -> {root, hull, turret, radar, color, tag, wedg
 const tankScale = () => (battleConfig?.body_half_width ?? 0.47) / 0.47;
 const botColor = (id) => new THREE.Color().setHSL((id * 0.137 + 0.03) % 1, 0.7, 0.56);
 
+// Bot-chosen colours (Robocode setColors), falling back to one hue per bot.
+const cssColor = (c, fallback) => { try { return c ? new THREE.Color(c) : fallback; } catch { return fallback; } };
+function readable(c) {   // labels and swatches must stay visible on the dark UI
+  const hsl = {}; c.getHSL(hsl);
+  return hsl.l < 0.55 ? new THREE.Color().setHSL(hsl.h, hsl.s, 0.62) : c.clone();
+}
+
 function makeTank(bot) {
-  const color = botColor(bot.id);
-  const dark = color.clone().multiplyScalar(0.55);
+  const own = bot.colors || {};
+  const base = botColor(bot.id);
+  const color = cssColor(own.body, base);
+  const dark = cssColor(own.gun, color.clone().multiplyScalar(0.55));
+  const dish = cssColor(own.radar, new THREE.Color(0xe8eef8));
+  const accent = readable(own.body ? color : base);
   const mat = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
   const root = new THREE.Group();
 
@@ -658,8 +669,8 @@ function makeTank(bot) {
   root.add(turret);
 
   const radar = new THREE.Group(); radar.position.y = 0.52;
-  const dish = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.07, 0.05), mat(0xe8eef8));
-  dish.position.z = -0.04; radar.add(dish);
+  const dishMesh = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.07, 0.05), mat(dish));
+  dishMesh.position.z = -0.04; radar.add(dishMesh);
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.04), mat(0x8090a8));
   post.position.y = -0.05; radar.add(post);
   root.add(radar);
@@ -669,9 +680,10 @@ function makeTank(bot) {
   scene.add(root);
 
   const tag = document.createElement('div'); tag.className = 'tag';
-  tag.innerHTML = `<div class="n" style="color:#${color.getHexString()}">${bot.name}</div><div class="bar"><i></i></div><div class="bar heat"><i></i></div>`;
+  tag.innerHTML = `<div class="n" style="color:#${accent.getHexString()}">${bot.name}</div><div class="bar"><i></i></div><div class="bar heat"><i></i></div>`;
   $('labels').appendChild(tag);
-  return { id: bot.id, name: bot.name, root, hull, turret, radar, color, tag, wedges: [], state: 'alive', data: null };
+  return { id: bot.id, name: bot.name, root, hull, turret, radar, color: accent, tag, wedges: [], state: 'alive', data: null,
+           scanColor: cssColor(own.scan, accent), bulletColor: cssColor(own.bullet, null) };
 }
 
 // ---------------------------------------------------------------------------
@@ -780,7 +792,7 @@ function radarWedge(t, bot) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); geo.setIndex(idx);
   const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-    color: t.color, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
+    color: t.scanColor, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
   mesh.position.copy(toScene(bot.x, bot.y, bot.z + 0.6));
   scene.add(mesh);
   t.wedges.unshift(mesh);
@@ -832,8 +844,9 @@ function updateBullets(frame) {
     let e = bulletMeshes.get(b.id);
     const p = toScene(b.x, b.y, b.z);
     if (!e) {
-      const color = tanks.get(b.shooter)?.color || new THREE.Color(0xffd166);
-      const mesh = new THREE.Mesh(BULLET_GEO, new THREE.MeshBasicMaterial({ color: 0xfff3c4 }));
+      const shooter = tanks.get(b.shooter);
+      const color = shooter?.bulletColor || shooter?.color || new THREE.Color(0xffd166);
+      const mesh = new THREE.Mesh(BULLET_GEO, new THREE.MeshBasicMaterial({ color: shooter?.bulletColor || 0xfff3c4 }));
       mesh.scale.setScalar(0.06 + b.power * 0.03);
       const trailGeo = new THREE.BufferGeometry().setFromPoints([p, p]);
       const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 }));

@@ -90,7 +90,7 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
                 agent.bot_id, agent.name, agent.memory, agent.rules = bot_id, name, memory, rules
                 agent.on_round_start(round_number, rounds)
                 conn.send(("ok", agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn,
-                           agent.profile))
+                           agent.profile, agent.colors))
             elif kind == "decide":
                 _, seq, obs = msg
                 assert agent is not None
@@ -161,7 +161,7 @@ class ProcessBot(BattleAgent):
         reply = self._recv(START_TIMEOUT_S, "on_round_start")
         if reply[0] != "ok":
             raise BotProcessError(f"{self.name} failed in on_round_start:\n{reply[1]}")
-        _, self.adjust_gun_for_body_turn, self.adjust_radar_for_gun_turn, self.profile = reply
+        _, self.adjust_gun_for_body_turn, self.adjust_radar_for_gun_turn, self.profile, self.colors = reply
 
     def on_death(self) -> None:
         self._send(("death",))

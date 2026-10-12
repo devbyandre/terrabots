@@ -45,54 +45,11 @@ def _parse_args() -> argparse.Namespace:
 def _build_world(size: int, seed: int | None):
     """Create a WorldGrid with procedural terrain."""
     import random
-    import math
-    from terrabots.world_terrain import WorldGrid, TerrainType
+    from terrabots.map_generator import procedural
 
     if seed is not None:
         random.seed(seed)
-
-    world = WorldGrid(size, size)
-
-    # Simple procedural generation:
-    # - Perlin-ish noise via summed sine waves → elevation
-    # - Deep spots → water
-    # - High peaks → rock
-    # - Staircase clusters along medium slopes
-
-    freq1, freq2 = 0.09, 0.17
-    a1, a2 = 3.5, 1.5
-
-    # Random offsets give different maps each run
-    ox1, oy1 = random.uniform(0, 100), random.uniform(0, 100)
-    ox2, oy2 = random.uniform(0, 100), random.uniform(0, 100)
-
-    for x in range(size):
-        for y in range(size):
-            h = (
-                a1 * math.sin((x + ox1) * freq1) * math.cos((y + oy1) * freq1)
-                + a2 * math.sin((x + ox2) * freq2 + 1.3) * math.sin((y + oy2) * freq2)
-            )
-            # Shift to positive range
-            h = max(0.0, h + 1.0)
-
-            cell = world.get(x, y)
-            cell.elevation = round(h, 3)
-
-            # Classify terrain
-            if h < 0.4:
-                cell.terrain   = TerrainType.WATER
-                cell.water_depth = round(0.4 - h + 0.2, 2)
-            elif h > 5.0:
-                cell.terrain = TerrainType.ROCK
-            elif 2.5 < h < 3.5 and random.random() < 0.12:
-                cell.terrain = TerrainType.STAIRS
-            else:
-                cell.terrain = TerrainType.PLAIN
-
-            # Sync elevation map (required for numpy LOS)
-            world.elevation_map[x, y] = cell.elevation
-
-    return world
+    return procedural(size, size, rng=random)
 
 
 def _load_agent_spec(spec: str) -> tuple[type, int]:

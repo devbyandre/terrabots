@@ -1,0 +1,25 @@
+# Example battle: terrabots-battle battles/example.toml
+# Any BattleConfig field can be set here; see terrabots/battle/config.py.
+rounds = 5
+seed = 42
+width = 48
+height = 48
+terrain = "procedural"
+max_ticks_per_round = 2000
+hit_energy_return = "damage"
+
+[[bots]]
+spec = "terrabots.agents.tracker:Tracker"
+count = 2
+
+[[bots]]
+spec = "terrabots.agents.spin_bot:SpinBot"
+count = 2
+
+[[bots]]
+spec = "terrabots.agents.crazy:Crazy"
+count = 1
+
+[[bots]]
+spec = "terrabots.agents.sitting_duck:SittingDuck"
+count = 1

@@ -113,7 +113,7 @@ Verified:
    200-tick run: resources 53 → 0). Fix: spawn new resource cells at a configurable
    rate on PLAIN/STAIRS cells (add `ResourceConfig.spawn_rate`).
 2. **No built-in opponents.** MuBot lives in a private sibling repo (`../mubot`,
-   `devbyandre/mubot`) and must not be added here. The public framework only ships
+   `devbyandre/terrabots_mubot`) and must not be added here. The public framework only ships
    `bots/wanderer.py`; demo/test bots (`terrabots/agents/`) are still to do.
 3. *(moved to the private mubot repo: MuBot port caveats)*
 4. Viewer agents are box placeholders. The Quaternius CC0 tank GLB

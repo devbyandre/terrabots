@@ -3,7 +3,7 @@ Find battle bots for the setup screen.
 
 Scans ./bots/*.py (your bots) and terrabots/agents/*.py (built-in demo bots) for
 BattleAgent subclasses defined in those files. Extra specs (e.g. a bot from an
-installed package, `mubot:MuBotBattle`) can be added explicitly.
+installed package, `mypackage.bots:MyTank`) can be added explicitly.
 
 Importing a file runs its code, so this has the same trust caveat as running
 the bots: only put bots you trust in these directories.

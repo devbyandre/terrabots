@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terrabots: program tanks in Python</title>
+<meta name="description" content="A Robocode-style battle arena for learning Python, AI, statistics and ML, on 2.5D terrain where hills block radar and high ground wins fights.">
+<meta property="og:title" content="Terrabots: program tanks in Python, fight on real terrain">
+<meta property="og:description" content="Open-source Robocode-style tank battles on elevation-aware terrain. One file per bot, seeded headless battles, live 3D viewer.">
+<meta property="og:image" content="assets/battle.png">
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #090d14;
+    --bg-2: #0e141e;
+    --card: #111926;
+    --line: #1f2a3c;
+    --line-2: #2b3a52;
+    --text: #dbe2ec;
+    --muted: #8c99ad;
+    --dim: #5f6c80;
+    --accent: #f2b33d;
+    --accent-2: #ffcf73;
+    --grass: #8fb35a;
+    --water: #5f9bd0;
+    --radar: rgba(242, 179, 61, 0.18);
+    --max: 1120px;
+    --display: "Space Grotesk", system-ui, sans-serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.6 var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: inherit; }
+  img { max-width: 100%; height: auto; display: block; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; line-height: 1.12; }
+  h2 { font-size: clamp(28px, 4vw, 40px); margin-bottom: 14px; }
+  .lede { color: var(--muted); font-size: 18px; max-width: 640px; }
+  .eyebrow { font: 500 13px/1 var(--mono); color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px; }
+  section { padding: 96px 0; }
+  @media (max-width: 700px) { section { padding: 64px 0; } }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(9, 13, 20, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
+  .logo { font: 700 20px var(--display); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  .logo span span { color: var(--accent); }
+  .logo svg { width: 26px; height: 26px; }
+  nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; }
+  nav .links a { color: var(--muted); text-decoration: none; }
+  nav .links a:hover { color: var(--text); }
+  @media (max-width: 700px) { nav .links a:not(.gh) { display: none; } }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line-2); transition: transform .15s, background .15s; }
+  .btn:hover { transform: translateY(-1px); background: #172133; }
+  .btn.primary { background: var(--accent); color: #1c1405; border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-2); }
+  .btn svg { width: 18px; height: 18px; }
+
+  /* hero */
+  .hero { padding: 80px 0 40px; position: relative; }
+  .hero::before {
+    content: ""; position: absolute; inset: -200px 0 auto; height: 700px; z-index: -1;
+    background: radial-gradient(600px 300px at 70% 20%, rgba(242,179,61,0.12), transparent 70%),
+                radial-gradient(500px 300px at 15% 10%, rgba(95,155,208,0.10), transparent 70%);
+  }
+  .hero h1 { font-size: clamp(40px, 7vw, 76px); max-width: 900px; margin-bottom: 22px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero .cta { display: flex; gap: 12px; flex-wrap: wrap; margin: 32px 0 54px; }
+  .install { font: 14px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 10px; margin-top: -30px; margin-bottom: 54px; }
+  .install code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--text); overflow-x: auto; white-space: nowrap; max-width: 100%; }
+  .shot { border-radius: 14px; border: 1px solid var(--line-2); overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(242,179,61,0.06); background: #0b1018; }
+  .shot .bar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .shot .bar i { width: 10px; height: 10px; border-radius: 50%; background: #253247; }
+  .shot .bar span { margin-left: 10px; font: 12px var(--mono); color: var(--dim); }
+
+  /* stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-top: 56px; }
+  .stats div { background: var(--bg-2); padding: 22px; }
+  .stats b { display: block; font: 700 30px var(--display); color: var(--text); }
+  .stats span { color: var(--muted); font-size: 14px; }
+  @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+  /* features */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 44px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+  .card .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(242,179,61,0.1); color: var(--accent); margin-bottom: 16px; }
+  .card .ic svg { width: 20px; height: 20px; }
+  .card h3 { font-size: 19px; margin-bottom: 8px; }
+  .card p { color: var(--muted); font-size: 15px; }
+
+  /* high ground */
+  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+  .diagram { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .diagram svg { width: 100%; height: auto; }
+  .diagram .cap { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .diagram .cap i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  ul.checks { list-style: none; margin-top: 22px; display: grid; gap: 12px; }
+  ul.checks li { padding-left: 28px; position: relative; color: var(--muted); }
+  ul.checks li b { color: var(--text); font-weight: 600; }
+  ul.checks li::before { content: ""; position: absolute; left: 0; top: 7px; width: 14px; height: 14px; border-radius: 4px; background: var(--accent); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/contain no-repeat; }
+
+  /* code */
+  .codebox { background: #0b111b; border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; }
+  .codebox .tab { font: 12px var(--mono); color: var(--dim); padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  pre { font: 13px/1.65 var(--mono); padding: 18px 20px; overflow-x: auto; color: #c9d4e3; }
+  .k { color: #ff9e64; } .s { color: #a5d98a; } .c { color: #5f6c80; } .f { color: #7dc4ff; } .n { color: #e6c07b; }
+  .steps { display: grid; gap: 18px; counter-reset: step; }
+  .step { display: grid; grid-template-columns: 36px 1fr; gap: 14px; }
+  .step::before { counter-increment: step; content: counter(step); width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line-2); display: grid; place-items: center; font: 600 15px var(--display); color: var(--accent); }
+  .step h3 { font-size: 18px; margin: 6px 0 4px; }
+  .step p { color: var(--muted); font-size: 15px; }
+  .step code, p code, li code { font: 13px var(--mono); background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--text); }
+
+  /* gallery */
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 40px; }
+  @media (max-width: 700px) { .gallery { grid-template-columns: 1fr; } }
+  figure { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  figure img { aspect-ratio: 16 / 9; object-fit: cover; object-position: center; width: 100%; height: auto; }
+  figcaption { padding: 12px 16px; font-size: 14px; color: var(--muted); }
+  figcaption b { color: var(--text); font-weight: 600; }
+
+  /* audiences */
+  .aud { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+  @media (max-width: 900px) { .aud { grid-template-columns: 1fr; } }
+  .aud .card h3 { color: var(--accent); }
+
+  /* terminal */
+  .term { max-width: 760px; margin: 36px auto 0; text-align: left; }
+  .center { text-align: center; }
+  .center .lede { margin: 0 auto; }
+  .final .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0; color: var(--dim); font-size: 14px; }
+  footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Terrabots home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 26 L11 14 L16 20 L22 10 L30 26 Z" fill="#8fb35a"/><path d="M22 10 L30 26 L24 26 Z" fill="#6c8a42"/><rect x="5" y="21" width="9" height="4" rx="1" fill="#f2b33d"/><rect x="8" y="19" width="4" height="3" rx="1" fill="#c88a1e"/><rect x="11.5" y="19.8" width="5" height="1.2" fill="#c88a1e"/></svg>
+      <span>Terra<span>bots</span></span>
+    </a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#bot">Write a bot</a>
+      <a href="#audience">Who it's for</a>
+      <a class="gh" href="https://github.com/devbyandre/terrabots">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">Open source · Python 3.11+ · MIT</div>
+    <h1>Program tanks in Python. Fight on <em>real terrain</em>.</h1>
+    <p class="lede">Terrabots is a Robocode-style battle arena for learning Python, AI, statistics and machine learning. Hills block your radar, high ground lets you shoot over cover, and steep slopes stop your tracks.</p>
+    <div class="cta">
+      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn" href="https://github.com/devbyandre/terrabots">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+    <div class="install"><span>$</span><code>pip install -e ".[dev]" &amp;&amp; terrabots-battle</code></div>
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i><span>localhost:8765 · battle viewer</span></div>
+      <img src="assets/battle.png" alt="Six tanks on procedural terrain with translucent radar sweeps, scan lines and a live scoreboard" width="1440" height="810">
+    </div>
+    <div class="stats">
+      <div><b>1 file</b><span>is a complete bot</span></div>
+      <div><b>31</b><span>tunable battle rules</span></div>
+      <div><b>~10k</b><span>ticks per second headless</span></div>
+      <div><b>100%</b><span>reproducible with a seed</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="eyebrow">Features</div>
+    <h2>Robocode's rules, on a world with height</h2>
+    <p class="lede">Everything you remember from programming tanks, plus terrain that changes how you move, see and aim.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l6-9 4 5 3-4 5 8z"/></svg></div>
+        <h3>Terrain is a mechanic</h3>
+        <p>Elevation-aware line of sight for radar, bullets and messages. Rock and hills block, stairs give vantage, steep steps are impassable.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l6-4"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <h3>Body, gun, radar</h3>
+        <p>Three independent headings with per-tick turn limits. Lock your radar, lead your shots, dodge with anti-gravity movement.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 3L4 14h7l-1 7 9-11h-7z"/></svg></div>
+        <h3>Energy economics</h3>
+        <p>Bullets cost energy and heat the gun; hits pay it back. Choose Robocode's rule, damage-dealt, or none, and compare strategies.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"/></svg></div>
+        <h3>Headless &amp; reproducible</h3>
+        <p>Run hundreds of seeded rounds from the CLI or Python and export JSON/CSV results for pandas, R or a spreadsheet.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+        <h3>Live 3D viewer</h3>
+        <p>Set up battles in the browser, watch radar sweeps and tracers, pause and single-step, follow a bot, read the results table.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M7 10.5V16c0 1.5 2.5 3 5 3s5-1.5 5-3v-5.5"/></svg></div>
+        <h3>Made for learning</h3>
+        <p>Readable code, typed dataclasses, tests for every rule. Debug <code>decide()</code> with breakpoints in VS Code.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow">The high ground</div>
+      <h2>Your radar can't see through a hill</h2>
+      <p class="lede">Line of sight compares the terrain along the way with the sightline from your eye height. Bullets fly level at muzzle height, so whatever is taller stops them.</p>
+      <ul class="checks">
+        <li><b>Hide</b> behind a ridge and nobody can scan you.</li>
+        <li><b>Climb</b> the stairs to see, and shoot, over low cover.</li>
+        <li><b>Plan paths:</b> your bot gets a range-limited terrain view and climb limits apply.</li>
+      </ul>
+    </div>
+    <div class="diagram" role="img" aria-label="Diagram: a tank on low ground cannot see a tank behind a hill; a tank on stairs can see over it">
+      <svg viewBox="0 0 560 260">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb35a"/><stop offset="1" stop-color="#4f6b2c"/></linearGradient>
+        </defs>
+        <rect width="560" height="260" fill="#0b111b" rx="8"/>
+        <!-- ground -->
+        <path d="M0 210 H140 V200 H170 V180 H200 V160 H220 V160 H240 V200 H300 V130 H330 V100 H350 V130 H370 V210 H560 V260 H0 Z" fill="url(#g)"/>
+        <!-- stairs highlight -->
+        <path d="M140 200 H170 V180 H200 V160 H240 V200" fill="none" stroke="#c9a15a" stroke-width="3"/>
+        <!-- blocked ray -->
+        <line x1="70" y1="196" x2="470" y2="196" stroke="#ef6b5b" stroke-width="2.5" stroke-dasharray="6 6"/>
+        <line x1="70" y1="196" x2="300" y2="196" stroke="#ef6b5b" stroke-width="2.5"/>
+        <circle cx="300" cy="196" r="6" fill="#ef6b5b"/>
+        <!-- clear ray -->
+        <line x1="222" y1="146" x2="470" y2="196" stroke="#f2b33d" stroke-width="2.5"/>
+        <!-- tanks -->
+        <g transform="translate(52 198)"><rect width="36" height="12" rx="3" fill="#7dc4ff"/><rect x="10" y="-7" width="15" height="8" rx="2" fill="#4f8fc4"/><rect x="24" y="-5" width="16" height="3" fill="#4f8fc4"/></g>
+        <g transform="translate(204 148)"><rect width="36" height="12" rx="3" fill="#f2b33d"/><rect x="10" y="-7" width="15" height="8" rx="2" fill="#c88a1e"/><rect x="24" y="-5" width="16" height="3" fill="#c88a1e"/></g>
+        <g transform="translate(456 198)"><rect width="36" height="12" rx="3" fill="#e57a9a"/><rect x="11" y="-7" width="15" height="8" rx="2" fill="#b4566f"/><rect x="-4" y="-5" width="16" height="3" fill="#b4566f"/></g>
+        <text x="70" y="240" fill="#0b111b" font-family="Inter" font-size="13" font-weight="600">low ground</text>
+        <text x="150" y="128" fill="#dbe2ec" font-family="Inter" font-size="13">on the stairs</text>
+        <text x="306" y="88" fill="#dbe2ec" font-family="Inter" font-size="13">hill</text>
+        <text x="440" y="240" fill="#0b111b" font-family="Inter" font-size="13" font-weight="600">target</text>
+      </svg>
+      <div class="cap"><span><i style="background:#ef6b5b"></i>blocked: the hill rises above the sightline</span><span><i style="background:#f2b33d"></i>clear: elevation gives vantage</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="bot">
+  <div class="wrap split">
+    <div class="codebox">
+      <div class="tab">bots/my_tank.py</div>
+<pre><span class="k">from</span> terrabots.battle <span class="k">import</span> BattleAction, BattleAgent
+<span class="k">from</span> terrabots.battle.geometry <span class="k">import</span> normalize_angle
+
+
+<span class="k">class</span> <span class="n">MyTank</span>(BattleAgent):
+    <span class="s">"""Sweeps its gun until it sees someone, then fires."""</span>
+
+    <span class="k">def</span> <span class="f">decide</span>(self, obs) -> BattleAction:
+        <span class="k">if not</span> obs.scanned_bots:
+            <span class="k">return</span> BattleAction(velocity=<span class="n">0.3</span>, gun_turn=<span class="n">20</span>)  <span class="c"># search</span>
+
+        enemy = obs.scanned_bots[<span class="n">0</span>]
+        aim = normalize_angle(enemy.bearing - obs.gun_heading)
+        <span class="k">return</span> BattleAction(
+            velocity=<span class="n">0.3</span>,
+            gun_turn=aim,
+            fire=<span class="n">2.0</span> <span class="k">if</span> abs(aim) < <span class="n">5</span> <span class="k">else</span> <span class="n">0.0</span>,
+        )</pre>
+    </div>
+    <div>
+      <div class="eyebrow">Write a bot</div>
+      <h2>From zero to firing in fifteen lines</h2>
+      <div class="steps" style="margin-top: 26px;">
+        <div class="step"><div><h3>Copy the template</h3><p>Start from <code>bots/first_tank.py</code>. Every tick you get a <code>BattleObservation</code> and return a <code>BattleAction</code>.</p></div></div>
+        <div class="step"><div><h3>Run a battle</h3><p><code>terrabots-battle</code> opens the setup screen. Your bot is already in the list; add a few demo opponents and press Start.</p></div></div>
+        <div class="step"><div><h3>Measure, then improve</h3><p>Run 100 seeded rounds headless, compare hit rates and survival, try radar locks, linear targeting, GuessFactors or a neural net.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top: 0;">
+  <div class="wrap">
+    <div class="eyebrow">Screens</div>
+    <h2>Set up, watch, analyse</h2>
+    <div class="gallery">
+      <figure><img src="assets/closeup.png" alt="Close-up of a tank with its radar locked on an enemy" width="1440" height="810"><figcaption><b>Follow a bot.</b> Radar lock, scan lines and tracers up close.</figcaption></figure>
+      <figure><img src="assets/topdown.png" alt="Top-down view of the arena with lakes and hills" width="1440" height="810"><figcaption><b>Top-down view.</b> The classic Robocode perspective, with terrain.</figcaption></figure>
+      <figure><img src="assets/setup.png" alt="Battle setup screen with bot counters and grouped settings" width="1440" height="810"><figcaption><b>Setup screen.</b> Pick bots, tune every rule, load and save TOML.</figcaption></figure>
+      <figure><img src="assets/results.png" alt="Results table with scores, placements and hit rates" width="1440" height="810"><figcaption><b>Results.</b> Robocode-style scoring, saved as JSON and CSV.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="audience" style="background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="eyebrow">Who it's for</div>
+    <h2>A game for learning, serious enough for research</h2>
+    <div class="aud">
+      <div class="card"><h3>Students</h3><p>Learn Python by making something that fights back. Geometry, state machines and debugging stop being abstract when your tank keeps missing.</p></div>
+      <div class="card"><h3>Teachers</h3><p>One-file bots, readable source, tests for every rule and a VS Code setup that works on day one. Run a class tournament headless in seconds.</p></div>
+      <div class="card"><h3>Researchers</h3><p>Seeded, deterministic multi-agent battles with partial observability, configurable rules and flat feature vectors for ML and RL experiments.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="start" class="final center">
+  <div class="wrap">
+    <div class="eyebrow">Get started</div>
+    <h2>Your first battle in a minute</h2>
+    <p class="lede">Python 3.11 or newer. Nothing else to install: the viewer runs in your browser.</p>
+    <div class="codebox term">
+      <div class="tab">terminal</div>
+<pre>git clone https://github.com/devbyandre/terrabots.git
+<span class="k">cd</span> terrabots
+python3 -m venv .venv && <span class="k">source</span> .venv/bin/activate
+pip install -e <span class="s">".[dev]"</span>
+
+terrabots-battle                         <span class="c"># → http://localhost:8765/</span>
+terrabots-battle battles/example.toml --headless</pre>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/devbyandre/terrabots#readme">Read the docs</a>
+      <a class="btn" href="https://github.com/devbyandre/terrabots/blob/main/docs/arena-spec.md">Battle spec</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Terrabots · MIT License · © 2026 André Munzinger</span>
+    <span>Inspired by <a href="https://robocode.sourceforge.io/">Robocode</a>; an independent project, not affiliated with it.</span>
+  </div>
+</footer>
+
+</body>
+</html>

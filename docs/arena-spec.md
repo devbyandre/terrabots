@@ -1,6 +1,10 @@
-# Battle Arena — Specification (not yet implemented)
+# Battle Arena — Specification
 
-Status: **design spec, nothing in this document is built yet.** It describes the
+Status: **implemented 2026-10-12** (steps 1–9 of §12 except the MuBot port, which
+lives in a private repo). Deviations from this text: radar range default 25
+cells; firing is capped at remaining energy so a bot can shoot itself to exactly
+0 and become disabled (§4); `foraging_enabled` not built; procedural tanks
+instead of the GLB (§11). It describes the
 Robocode-style battle mode requested on 2026-10-12. Defaults marked *(decision)*
 were chosen by Claude so work can start; André can override any of them — see
 [§9 Open decisions](#9-open-decisions).

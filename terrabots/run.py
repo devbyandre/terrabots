@@ -5,7 +5,7 @@ Usage:
     python -m terrabots.run                    # defaults: 64x64, 10 Wanderers, 500 ticks
     python -m terrabots.run --headless         # no viewer, prints stats
     python -m terrabots.run --ticks 200 --agents 20 --size 32
-    python -m terrabots.run --agent bots.wanderer:WandererAgent=5 --agent mubot:MuBotAgent=5   # any installed bot package
+    python -m terrabots.run --agent bots.wanderer:WandererAgent=5 --agent mypackage.bots:MyAgent=5   # any installed bot package
     terrabots-run --help                       # when installed via pip
 
 With the viewer on, open http://localhost:8765/ in a browser (page and

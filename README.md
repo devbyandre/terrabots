@@ -1,139 +1,229 @@
+<div align="center">
+
 # Terrabots
 
-A Python framework for building, studying, and competing with autonomous agents in a
-2.5D world with terrain, elevation-aware line of sight and agent communication.
-Inspired by Robocode. Today it runs a **survival mode** (foraging, energy, social
-behaviour); a Robocode-style **battle mode** with tanks, radar and bullets is
-specified in [docs/arena-spec.md](docs/arena-spec.md) and not built yet.
+**Program tanks in Python. Fight on real terrain.**
 
-Designed as a teaching and research platform: build an agent in one file, run it
-against others, measure what strategies actually win, and learn Python, AI, statistics,
-and machine learning along the way.
+A Robocode-style battle arena and agent-simulation framework for learning Python,
+AI, statistics and machine learning, on a 2.5D world where hills block your radar,
+high ground lets you shoot over cover, and steep slopes stop your tracks.
 
----
+[![CI](https://github.com/devbyandre/terrabots/actions/workflows/ci.yml/badge.svg)](https://github.com/devbyandre/terrabots/actions/workflows/ci.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
+[![License: MIT](https://img.shields.io/badge/license-MIT-f2b33d)](LICENSE)
 
-## Key concepts
+[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Rules](#battle-rules) · [Spec](docs/arena-spec.md)
 
-| Robocode concept | Terrabots equivalent |
-|---|---|
-| Tank bot | Creature agent |
-| Shooting / targeting | Foraging / resource prediction |
-| Anti-gravity movement | Repulsion-based flocking movement |
-| GuessFactor histogram | Resource-location histogram |
-| Health points | Energy (depletes each tick; replenished by foraging) |
-| Round win/loss | Survival time / population fitness |
-| Team coordination | LOS-gated, range-limited inter-agent messaging |
+<img src="docs/assets/battle.png" alt="Six tanks battling on procedural terrain, with radar sweeps and scan lines" width="900">
+
+</div>
 
 ---
+
+## Why Terrabots
+
+- **One file, one bot.** Subclass `BattleAgent`, return a `BattleAction` from
+  `decide()`, done. No build step, no game engine to learn.
+- **Terrain is a mechanic, not decoration.** Line of sight is elevation-aware:
+  hills and rock block radar and bullets, stairs give vantage, and bodies can't
+  climb steep steps. Position matters as much as aim.
+- **Robocode's rules, Python's ecosystem.** Body, gun and radar turn
+  independently; bullets cost energy and heat the gun; rounds are scored like
+  Robocode. Then plug in numpy, scikit-learn or PyTorch.
+- **Built for experiments.** Seeded, deterministic battles run headless at
+  thousands of ticks per second and export results as JSON/CSV for analysis.
+- **Watch it live.** A browser viewer with a setup screen, a 3D battle view and
+  a Robocode-style results table.
 
 ## Quick start
 
 ```bash
+git clone https://github.com/devbyandre/terrabots.git
+cd terrabots
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-pytest -q                     # run the test suite
 
-terrabots-run                    # simulation + viewer: open http://localhost:8765/
-terrabots-run --headless         # no browser, prints tick stats
-terrabots-run --agent bots.wanderer:WandererAgent=5 --agent bots.my_bot:MyBot=5
+terrabots-battle                    # open http://localhost:8765/ → pick bots → Start
+```
+
+Headless, for tournaments and statistics:
+
+```bash
+terrabots-battle battles/example.toml --headless
+terrabots-battle --headless --rounds 50 --seed 1 \
+    --bot bots.first_tank:FirstTank --bot terrabots.agents.tracker:Tracker=2
+```
+
+Example output:
+
+```
+rank  name                       total  survival    bullet     ram   1st   2nd   3rd    hit%
+--------------------------------------------------------------------------------------------
+   1  Tracker (1)                  936       450       394       0     1     0     1    36.0
+   2  Crazy                        924       550       277       2     1     1     0    30.0
+   ...
+Saved results/20261012-184137.json
 ```
 
 **VS Code:** open the folder, accept the recommended extensions, run the task
-*Terrabots: Setup venv*, then press F5 and pick a launch configuration. Breakpoints in
-your bot's `decide()` work.
+*Terrabots: Setup venv*, press F5 and pick a launch configuration. Breakpoints in
+`decide()` work; turn time limits switch off automatically under the debugger.
 
----
+## Your first tank
+
+```python
+# bots/my_tank.py
+from terrabots.battle import BattleAction, BattleAgent, BattleObservation
+from terrabots.battle.geometry import normalize_angle
+
+
+class MyTank(BattleAgent):
+    """Sweeps its gun until the radar sees someone, then aims and fires."""
+
+    def decide(self, obs: BattleObservation) -> BattleAction:
+        if not obs.scanned_bots:
+            return BattleAction(velocity=0.3, body_turn=4, gun_turn=20)   # search
+
+        enemy = obs.scanned_bots[0]
+        aim = normalize_angle(enemy.bearing - obs.gun_heading)
+        return BattleAction(velocity=0.3, body_turn=4, gun_turn=aim,
+                            fire=2.0 if abs(aim) < 5 else 0.0)
+```
+
+Bots in `bots/` show up in the setup screen automatically. Start from
+[`bots/first_tank.py`](bots/first_tank.py), then read the demo bots for the next
+steps: radar lock and head-on aim in
+[`tracker.py`](terrabots/agents/tracker.py), linear targeting in
+[`crazy.py`](terrabots/agents/crazy.py).
+
+**What a bot sees** (`BattleObservation`): its position, three headings, speed,
+energy and gun heat; `scanned_bots` from this tick's radar sweep; events
+(`hit_by_bullet`, `bullet_hit`, `bullet_missed`, `hit_wall`, `hit_bot`,
+`bot_death`); messages from teammates; and a range-limited `terrain` view for
+path planning. It never sees global state: other bots are known only through radar.
+
+**What a bot does** (`BattleAction`): target `velocity`, `body_turn`, `gun_turn`,
+`radar_turn` (degrees, clockwise, 0 = north) and `fire` power, all clamped by the
+rules each tick.
+
+## Battle rules
+
+Robocode's numbers, converted at 16 px per cell. Every value is a field of
+[`BattleConfig`](terrabots/battle/config.py), editable in the setup screen or a
+battle TOML.
+
+| Rule | Default |
+|---|---|
+| Max speed / acceleration / braking | 0.5 cells/tick · 1/16 · 2/16 |
+| Body turn | 10° − 0.75° per px/tick of speed |
+| Gun / radar turn | 20° / 45° per tick |
+| Bullet power | 0.1 – 3.0, costs that much energy |
+| Bullet speed | 20 − 3·power px/tick |
+| Damage | 4·p, plus 2·(p − 1) above power 1 |
+| Energy back on hit | the damage dealt (or Robocode's 3·p, or none) |
+| Gun heat | 1 + p/5 per shot, cools 0.1/tick |
+| Radar range | 25 cells, needs line of sight |
+| Bullets | fly at muzzle height; terrain higher than that stops them |
+| Walls, rams | stop the tank; wall damage scales with speed, rams deal 0.6 each |
+
+Scoring follows Robocode: survival, last-survivor bonus, bullet and ram damage,
+and kill bonuses. The full spec, including the design decisions and what's still
+open, is in [docs/arena-spec.md](docs/arena-spec.md).
+
+<table>
+<tr>
+<td><img src="docs/assets/setup.png" alt="Battle setup screen with bot counts and grouped settings"></td>
+<td><img src="docs/assets/results.png" alt="Results table after a battle"></td>
+</tr>
+<tr>
+<td align="center"><sub>Setup: pick bots, tune every rule, load or save TOML</sub></td>
+<td align="center"><sub>Results: Robocode-style table, also saved as JSON/CSV</sub></td>
+</tr>
+</table>
+
+## Use it from Python
+
+```python
+from terrabots.battle import BattleConfig, BattleRunner
+from terrabots.agents.tracker import Tracker
+from bots.my_tank import MyTank
+
+config = BattleConfig(rounds=100, seed=7, terrain="procedural", hit_energy_return="robocode")
+results = BattleRunner(config, [(MyTank, 1), (Tracker, 3)], time_budget_ms=None).run()
+
+print(results.table())
+rows = results.rows          # list of dicts: total, survival, bullet_damage, hit_rate, ...
+results.save("results/")     # JSON + CSV for pandas / R / a spreadsheet
+```
+
+Same seed and same bots give the same results, so you can compare strategies
+fairly. `BattleObservation.to_dict()` gives a flat feature vector for ML, and a
+per-class `self.memory` dict survives between rounds for bots that learn.
+
+## Survival mode
+
+The original Terrabots mode: creatures forage food, pay metabolism, climb
+terrain and shout messages to each other (range- and line-of-sight-gated).
+
+```bash
+terrabots-run                                   # viewer at http://localhost:8765/
+terrabots-run --headless --ticks 500 --seed 1
+terrabots-run --agent bots.wanderer:WandererAgent=10
+```
+
+Start from [`bots/wanderer.py`](bots/wanderer.py) and the `Agent` class in
+[`terrabots/framework/agent.py`](terrabots/framework/agent.py).
+
+## Built-in demo bots
+
+| Bot | Behaviour | Good for testing |
+|---|---|---|
+| `SittingDuck` | does nothing | your aim |
+| `SpinBot` | circles, spins its gun, fires at anything it sweeps | basic dodging |
+| `Tracker` | radar lock, head-on aim, holds ~10 cells distance | movement against a steady gun |
+| `Crazy` | erratic zig-zags, linear-prediction gun | both: hard to hit, hits back |
 
 ## Project layout
 
 ```
 terrabots/
-  framework/
-    agent.py          # Abstract Agent base class — implement this
-    actions.py        # Action dataclass agents return each tick
-    observation.py    # Observation dataclass agents receive each tick
-    simulation.py     # Simulation engine — wires the tick loop
-  agents/             # Built-in demo bots (planned)
-  world_terrain.py    # WorldGrid, Cell, TerrainType, VisibilityMgr, MovementResolver
-  comms.py            # CommsMgr — LOS + range gated messaging
-  viewer/
-    server.py         # Serves the viewer page + WebSocket stream on one port
-    index.html        # Three.js browser visualizer
-  run.py              # terrabots-run CLI and procedural terrain
-bots/
-  wanderer.py         # Smallest example bot — copy this to start your own
-docs/
-  arena-spec.md       # Battle mode specification (next feature)
-tests/
-  test_world_terrain.py
-  test_comms.py
-  test_simulation.py
+  battle/          battle mode: config, physics, arena, runner, scoring, CLI
+  agents/          built-in demo battle bots
+  framework/       survival mode: Agent, Action, Observation, Simulation
+  viewer/          browser viewers (battle.html, index.html) and their servers
+  world_terrain.py grid, elevation-aware LOS, passability and climbing
+  comms.py         range + LOS gated messaging
+  map_generator.py procedural and flat terrain
+bots/              your bots (first_tank.py, wanderer.py are templates)
+battles/           battle files (TOML)
+docs/              battle spec, website
+tests/             pytest suite
 ```
 
----
+## Roadmap
 
-## Building your own agent
+- [x] Survival mode, elevation-aware LOS, comms
+- [x] Battle mode: physics, radar, bullets, rounds, scoring, CLI, viewer
+- [ ] Teams (comms already exist) and team scoring
+- [ ] Bots in subprocesses for isolation and hard time limits
+- [ ] Map files and a map editor
+- [ ] Gymnasium / PettingZoo wrapper for reinforcement learning
+- [ ] Survival rules inside battles (foraging as an arena option)
 
-Subclass `Agent` and implement `decide()`. `on_birth()` and `on_message()` are optional:
+## A word on safety
 
-```python
-from terrabots.framework.agent import Agent
-from terrabots.framework.actions import Action, MoveDirection
-from terrabots.framework.observation import Observation
+Bots are ordinary Python running in the simulator's process. Running someone
+else's bot means running their code, so only run bots you trust. See
+[SECURITY.md](SECURITY.md).
 
-class MyAgent(Agent):
-    def on_birth(self) -> None:
-        """Called once when the agent enters the world. Set up internal state here."""
-        self.food_tips: list[tuple[int, int]] = []
+## Contributing
 
-    def on_message(self, sender_id: int, kind: str, payload: dict) -> None:
-        """Called before decide() for each message delivered to you this tick."""
-        if "pos" in payload:
-            self.food_tips.append(tuple(payload["pos"]))
-
-    def decide(self, obs: Observation) -> Action:
-        """Called every tick. Return what you want to do this tick."""
-        if obs.nearest_resource:
-            return Action(move_toward=obs.nearest_resource)
-        if self.food_tips:
-            return Action(move_toward=self.food_tips.pop())
-        return Action(move_direction=MoveDirection.RANDOM)
-```
-
-Save it as `bots/my_agent.py` and run it against the Wanderer:
-
-```bash
-terrabots-run --agent bots.my_agent:MyAgent=5 --agent bots.wanderer:WandererAgent=5
-```
-
-Or from Python:
-
-```python
-from terrabots.framework.simulation import Simulation
-from terrabots.world_terrain import WorldGrid
-
-world = WorldGrid(64, 64)
-sim = Simulation(world)
-sim.add_agent(MyAgent, count=10)
-sim.run(ticks=1000)
-```
-
-> Bots are ordinary Python code running in the simulator's process. Only run bots
-> you trust.
-
----
-
-## Educational goals
-
-- **Statistics**: agents collect hit/find histograms and adapt over time
-- **Machine learning**: plug in a PyTorch policy instead of a rule-based `decide()`
-- **Emergent behaviour**: run 100 agents with simple rules and watch what happens
-- **Multi-agent coordination**: implement flocking, role assignment, and broadcast protocols
-- **Reinforcement learning**: `Observation.to_dict()` gives a flat feature dict; a full Gymnasium/PettingZoo wrapper is planned
-
----
+Bug reports, bots, lessons and pull requests are welcome; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Attribution appreciated but not required.
-Created by André Munzinger. Contributions welcome.
+[MIT](LICENSE) © André Munzinger. Inspired by
+[Robocode](https://robocode.sourceforge.io/), the tank-programming game that got
+a generation of students into code. Terrabots is an independent project and not
+affiliated with Robocode.

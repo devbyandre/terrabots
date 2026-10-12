@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terrabots"
-version = "0.1.0"
-description = "2.5D creature-survival simulation framework for learning AI, statistics, and ML"
+version = "0.2.0"
+description = "Robocode-style tank battles and agent simulation on 2.5D terrain, for learning Python, AI, statistics and ML"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "André Munzinger", email = "munzinger.andre@web.de" }]
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Games/Entertainment :: Simulation",
 ]
@@ -34,6 +35,10 @@ dev = [
 ml = [
     "torch>=2.2",
 ]
+
+[project.urls]
+Homepage = "https://devbyandre.github.io/terrabots/"
+Repository = "https://github.com/devbyandre/terrabots"
 
 [project.scripts]
 terrabots-run = "terrabots.run:main"

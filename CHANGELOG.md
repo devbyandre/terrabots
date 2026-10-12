@@ -1,0 +1,26 @@
+# Changelog
+
+## 0.2.0 — 2026-10-12
+
+### Added
+- **Battle mode** (`terrabots-battle`): Robocode-style tanks with independent
+  body, gun and radar headings; radar sweeps gated by elevation-aware line of
+  sight; bullets that terrain can block; energy economics with three hit-return
+  modes; rounds and Robocode-like scoring; results as JSON/CSV.
+- Battle viewer: setup screen (bot discovery, every rule, TOML load/save), live
+  3D battle view, results dialog.
+- Demo bots: `SittingDuck`, `SpinBot`, `Tracker`, `Crazy`; template
+  `bots/first_tank.py`.
+- `BattleConfig` and TOML battle files (`battles/example.toml`).
+- Survival food respawn (`ResourceConfig.spawn_rate`).
+- CI on Python 3.11–3.13.
+
+### Changed
+- Project renamed from BioBot to Terrabots.
+- Viewers upgraded from Three.js r128 to 0.186.1.
+- Procedural terrain moved to `terrabots/map_generator.py`.
+- Test scenarios split into individual pytest functions.
+
+## 0.1.0
+
+- Survival mode: 2.5D terrain, elevation-aware LOS, comms, viewer.

@@ -186,7 +186,7 @@
           <h2>Bots</h2>
           <div id="bot-list"></div>
           <div class="add-spec">
-            <input id="add-spec" type="text" placeholder="module:ClassName (e.g. mubot:MuBotBattle)" aria-label="Add bot by spec">
+            <input id="add-spec" type="text" placeholder="module:ClassName (e.g. mypackage.bots:MyTank)" aria-label="Add bot by spec">
             <button id="b-add-spec">Add</button>
           </div>
         </section>
@@ -591,7 +591,8 @@ const RADAR_TRAIL = 5;
 function radarWedge(t, bot) {
   const range = battleConfig ? battleConfig.radar_range : 25;
   let sweep = ((bot.radar - bot.radar_prev + 540) % 360) - 180;
-  if (Math.abs(sweep) < 1.5) sweep = sweep < 0 ? -1.5 : 1.5;   // keep a locked radar visible
+  if (Math.abs(sweep) < 0.5) return;                            // radar not turning: nothing swept
+  if (Math.abs(sweep) < 3) sweep = Math.sign(sweep) * 3;        // keep a locked radar visible
   const steps = Math.max(2, Math.ceil(Math.abs(sweep) / 4));
   const verts = [0, 0, 0];
   for (let i = 0; i <= steps; i++) {

@@ -1,7 +1,7 @@
 # CLAUDE.md — Terrabots
 
-Briefing for Claude Code. Read this first, then `docs/arena-spec.md` for the next
-major feature.
+Briefing for Claude Code. Read this first; `docs/arena-spec.md` is the battle-mode
+spec (built, with the open decisions listed in its §9).
 
 ## What this is
 
@@ -14,8 +14,9 @@ educational/research use, so readability for learners matters as much as feature
 Two game modes:
 - **Survival mode** (built): agents forage food, pay metabolism, communicate, die at
   0 energy.
-- **Battle mode** (spec only): Robocode-style tanks with body/gun/radar headings,
-  bullets, rounds, scoring, a battle setup UI. See `docs/arena-spec.md`.
+- **Battle mode** (built): Robocode-style tanks with body/gun/radar headings,
+  bullets, rounds, scoring, a browser setup screen and results table
+  (`terrabots-battle`). See `docs/arena-spec.md`.
 
 ## Owner's working preferences (apply to all work here)
 
@@ -35,8 +36,10 @@ Two game modes:
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-pytest -q                                   # 11 tests, all passing as of 2026-10-12
-terrabots-run                                  # sim + viewer → open http://localhost:8765/
+pytest -q                                      # 82 tests, all passing as of 2026-10-12
+terrabots-battle                               # battle setup screen → http://localhost:8765/
+terrabots-battle battles/example.toml --headless   # results table + results/*.json/csv
+terrabots-run                                  # survival sim + viewer → http://localhost:8765/
 terrabots-run --headless --ticks 500 --seed 1  # no browser
 terrabots-run --agent bots.wanderer:WandererAgent=5 --agent mubot:MuBotAgent=5   # needs private mubot repo installed
 terrabots-run --help
@@ -53,20 +56,25 @@ terrabots/
   world_terrain.py      WorldGrid, Cell, TerrainType, CreatureMoveProfile,
                         VisibilityMgr (LOS), MovementResolver (passability, move cost)
   comms.py              CommsMgr: shout-range + LOS gated, per-tick mailbox
-  framework/
-    agent.py            Agent ABC: decide(obs) -> Action; on_birth/on_message/on_death
-    actions.py          Action, MoveDirection, Shout
-    observation.py      Observation + percept dataclasses; to_dict() for RL
-    simulation.py       Simulation: tick loop, observations, foraging, regen, snapshots
-  agents/               Built-in demo bots (empty; planned). MuBot is private, see below
-  viewer/server.py      HTTP (index.html) + WebSocket (/ws) on one port, broadcast-only
-  viewer/index.html     Three.js r128 viewer: flat-shaded terrain, box agents, HUD
-  run.py                CLI entry point (terrabots-run), procedural terrain, --agent specs
-bots/                   User bots (Robocode "robots" dir). wanderer.py = template
-tests/                  test_world_terrain.py, test_comms.py (script-style scenarios
-                        wrapped by one pytest function each), test_simulation.py
-docs/arena-spec.md      Battle mode spec: next major feature
-.vscode/                Launch / tasks / settings
+  map_generator.py      procedural() and flat() terrain, explicit rng
+  framework/            survival mode: Agent, Action, Observation, Simulation
+  battle/
+    config.py           BattleConfig (all rules, validated) + BattleFile (TOML)
+    physics.py          BattleBody, kinematics, radar arc, bullet geometry (pure functions)
+    arena.py            Arena: one round, tick loop, events, damage, deaths
+    scoring.py          Robocode-like scoring per round
+    runner.py           BattleRunner: rounds, totals, BattleResults (JSON/CSV/table)
+    agent.py, actions.py, observation.py, events.py, geometry.py   bot-facing API
+    discovery.py        finds BattleAgent subclasses in bots/ and terrabots/agents/
+    cli.py              terrabots-battle
+  agents/               demo battle bots: SittingDuck, SpinBot, Tracker, Crazy
+  viewer/               index.html + server.py (survival, broadcast-only);
+                        battle.html + battle_server.py (bidirectional, setup/results)
+  run.py                terrabots-run (survival CLI)
+bots/                   user bots: first_tank.py (battle template), wanderer.py (survival)
+battles/example.toml    example battle file
+docs/                   arena-spec.md; index.html + assets/ = GitHub Pages landing page
+tests/                  pytest, one function per rule/scenario
 ```
 
 ## Core design invariants (don't break these without discussing)
@@ -92,57 +100,57 @@ docs/arena-spec.md      Battle mode spec: next major feature
 7. **Agents only see what they perceive.** `Observation` is range- and LOS-filtered;
    never hand agents global state.
 8. Resources live in `Simulation._resources` (`{(x, y): amount}`), not on cells.
+9. **Battle tick order** (`Arena.step`): observe + decide (timed) → cool/fire (gun
+   heading before turning) → turn → move (walls, rams) → bullets → radar → deaths →
+   comms. Events reach bots one tick later.
+10. **Battle perception:** other bots only via radar (`scanned_bots`) and events;
+    terrain via a range-limited `TerrainView`. Headings are Robocode's (0 = north,
+    clockwise). Robocode px values convert at `PX_PER_CELL = 16`.
+11. **Determinism:** same seed + same bots → identical results, as long as no turn
+    is skipped for time. Tests pass `time_budget_ms=None`.
 
 ## Current status (2026-10-12)
 
 Verified:
-- `pytest`: 11 passed (6 terrain LOS/movement scenarios, 7 comms scenarios run
-  inside 2 wrapper tests, 9 simulation integration tests).
-- Headless runs with mixed bot classes via `--agent`.
-- Viewer server: HTTP 200 for `/`, WebSocket sends `world_state` then `tick` messages
-  (checked with a Python client).
-- Viewer page rendered in headless Chromium (software GL) with a local copy of
-  three@0.128.0 substituted for the CDN: terrain, agents, resources and HUD show,
-  no console errors. **Not yet checked in a real desktop browser loading Three.js
-  from jsDelivr.**
+- `pytest`: 82 passed (terrain, comms, survival sim, battle config, physics, arena,
+  runner determinism, CLI, battle server WebSocket round trip).
+- Headless battles of the demo bots (~10k ticks/s with 6 bots on this machine).
+- Battle viewer and survival viewer driven in headless Chromium (Playwright,
+  SwiftShader) with Three.js 0.186.1 from jsDelivr: setup → battle → results work,
+  no console errors. **Not yet checked in a real desktop browser / GPU.**
+- Landing page (`docs/index.html`) rendered at 1366 px and 390 px, no overflow.
+
+Decisions taken with the spec defaults (spec §9), not yet confirmed by André:
+hybrid continuous-on-grid; hit energy return = damage dealt; radar-only
+perception; disabled at exactly 0 energy (firing is capped at remaining energy,
+which is how a bot reaches 0; spec §4 originally said such a shot is rejected,
+which made "disabled" unreachable); free-for-all only; Robocode scoring weights;
+radar range 25 cells (spec value; Robocode's 1200 px would be 75).
 
 ## Known issues / tech debt (prioritised)
 
-1. **Food never respawns.** `_regen_resources()` only grows existing cells; a cell
-   eaten to 0 is deleted for good, so every world eventually starves (seen in a
-   200-tick run: resources 53 → 0). Fix: spawn new resource cells at a configurable
-   rate on PLAIN/STAIRS cells (add `ResourceConfig.spawn_rate`).
-2. **No built-in opponents.** MuBot lives in a private sibling repo (`../mubot`,
-   `devbyandre/terrabots_mubot`) and must not be added here. The public framework only ships
-   `bots/wanderer.py`; demo/test bots (`terrabots/agents/`) are still to do.
-3. *(moved to the private mubot repo: MuBot port caveats)*
-4. Viewer agents are box placeholders. The Quaternius CC0 tank GLB
-   (https://poly.pizza/m/Dc4k4CooN3) isn't wired in yet; check its node structure
-   (separate turret?) first.
-5. Three.js pinned to r128 (2021). Upgrade when doing battle UI (see spec §11).
-6. `world_state()` sends one JSON dict per cell, which is heavy beyond ~64×64. Move to
-   flat arrays.
-7. Per-tick observation cost: the terrain-percept loop does an LOS raycast for every
-   cell within perception radius for every agent (≈ agents × π r²). Fine for tens of
-   agents; cache per-agent visible cells or skip terrain percepts if it becomes the
-   bottleneck. Profile before optimising.
-8. `_random_passable_cell` rebuilds the occupied set on every attempt (O(n) each).
-9. `test_world_terrain.py` / `test_comms.py` are script-style scenarios behind one
-   pytest wrapper each. Split into individual `test_*` functions for clearer failures.
-10. `Observation.to_dict()` is a flat dict, not a Gymnasium `spaces` definition. A real
-    Gymnasium/PettingZoo wrapper is still to do.
-11. No map file loader yet (only procedural terrain in `run.py`). Candidate home:
-    `terrabots/map_generator.py`, with procedural generation moved out of `run.py`.
-12. No CI, no linter config beyond VS Code's ruff recommendation, no git remote yet.
+1. **MuBot battle port** lives in the private repo (`../mubot`,
+   `devbyandre/terrabots_mubot`); never add MuBot code here. A faithful port needs
+   the original Java source in that repo's `reference/`.
+2. Battle `foraging_enabled` (survival rules inside battles) and teams are not built.
+3. Bots run in-process; time budget is soft (a hung `decide()` blocks). Subprocess
+   isolation is the planned fix (spec §8).
+4. Battle terrain checks only the body's centre cell; a body can overlap a rock
+   cell's edge by up to its radius. Bullets hit-test in 2D (flight height only
+   matters for terrain blocking).
+5. Tanks are procedural low-poly meshes; the Quaternius GLB was not used (its node
+   structure is still unchecked).
+6. Survival `world_state()` still sends one JSON dict per cell (battle uses flat
+   base64 arrays; port that if survival maps grow past ~64×64).
+7. Survival observation cost: LOS raycast per cell in perception radius per agent.
+8. `_random_passable_cell` rebuilds the occupied set on every attempt.
+9. No map file loader; no Gymnasium/PettingZoo wrapper.
+10. Pages: GitHub Pages must be enabled once (Settings → Pages → main, /docs).
 
 ## Next work
 
-Primary: **battle mode**, implemented in the order of `docs/arena-spec.md` §12. Check
-the open decisions in §9 with André before step 2 (kinematics), because they shape
-the data model.
-
-Quick wins before or alongside it: known issues #1 (food respawn) and #9 (split
-tests), then a GitHub Actions workflow running `pytest` on 3.11–3.13.
+Confirm the §9 decisions with André; MuBot battle port (private repo); teams;
+subprocess bots; map files.
 
 ## Conventions
 

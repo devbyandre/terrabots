@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terrabots Battle</title>
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: rgba(13, 19, 29, 0.92);
+    --panel-solid: #111925;
+    --line: #26334a;
+    --line-soft: #1c2638;
+    --text: #d6dde8;
+    --muted: #8593a8;
+    --accent: #f2b33d;
+    --accent-ink: #1b1305;
+    --good: #5fd08a;
+    --bad: #ef6b5b;
+    --radius: 8px;
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--font); overflow: hidden; }
+  canvas { display: block; }
+  button, input, select { font: inherit; color: inherit; }
+  button {
+    background: #1a2434; border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover { border-color: #3a4b68; background: #202c40; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hidden { display: none !important; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(5, 8, 13, 0.72); backdrop-filter: blur(3px); z-index: 20; padding: 16px;
+  }
+  .dialog {
+    background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px;
+    width: min(1100px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .dialog header { padding: 18px 22px 12px; border-bottom: 1px solid var(--line-soft); }
+  .dialog header h1 { font-size: 20px; font-weight: 650; letter-spacing: 0.01em; }
+  .dialog header h1 span { color: var(--accent); }
+  .dialog header p { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .dialog .body { overflow: auto; padding: 16px 22px; }
+  .dialog footer {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center;
+    padding: 12px 22px; border-top: 1px solid var(--line-soft);
+  }
+  .dialog footer .spacer { flex: 1; }
+  .dialog footer .hint { color: var(--muted); font-size: 12px; }
+
+  /* setup */
+  .setup-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.4fr); gap: 22px; }
+  @media (max-width: 760px) { .setup-grid { grid-template-columns: 1fr; } }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .bot-group { margin-bottom: 14px; }
+  .bot-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius); margin-bottom: 6px;
+  }
+  .bot-row.active { border-color: #4a5a2c; background: rgba(242, 179, 61, 0.06); }
+  .bot-name { font-weight: 600; }
+  .bot-doc { color: var(--muted); font-size: 12px; }
+  .bot-spec { color: #5d6b80; font-size: 11px; font-family: var(--mono); overflow-wrap: anywhere; }
+  .counter { display: flex; align-items: center; gap: 4px; }
+  .counter button { width: 28px; height: 28px; padding: 0; }
+  .counter .num { width: 22px; text-align: center; }
+  .add-spec { display: flex; gap: 6px; margin-top: 6px; }
+  .add-spec input { flex: 1; min-width: 0; }
+  fieldset { border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 10px 12px 4px; margin-bottom: 12px; }
+  legend { padding: 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; }
+  .field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+  .field label { font-size: 12px; color: var(--muted); cursor: help; }
+  .field input[type=number], .field input[type=text], .field select, .add-spec input {
+    background: #0c121c; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; width: 100%;
+  }
+  .field.check { flex-direction: row; align-items: center; gap: 8px; padding-top: 18px; }
+  .field.check label { color: var(--text); }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed; top: 12px; left: 12px; z-index: 5; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-width: calc(100vw - 24px);
+  }
+  #hud .title { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+  #hud .title b { font-size: 15px; }
+  #hud .title .num { color: var(--muted); }
+  #hud .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  #hud .controls button { padding: 4px 10px; }
+  #hud .speed { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  #hud .keys { color: #5d6b80; font-size: 11px; margin-top: 6px; }
+  #hud .keys kbd { font-family: var(--mono); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--muted); }
+
+  #scoreboard {
+    position: fixed; top: 12px; right: 12px; z-index: 5; width: 270px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 10px 6px;
+  }
+  @media (max-width: 760px) { #scoreboard { top: auto; bottom: 12px; width: calc(100vw - 24px); } }
+  .sb-row {
+    display: grid; grid-template-columns: 10px 1fr 64px 48px; gap: 8px; align-items: center;
+    padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .sb-row:hover { background: rgba(255,255,255,0.04); }
+  .sb-row.followed { background: rgba(242, 179, 61, 0.12); }
+  .sb-row.dead { opacity: 0.42; }
+  .sb-row .sw { width: 10px; height: 10px; border-radius: 2px; }
+  .sb-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-row .sc { text-align: right; }
+  .bar { height: 6px; background: #1d2636; border-radius: 3px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--good); border-radius: 3px; }
+
+  #banner {
+    position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 12px 22px;
+    font-size: 18px; font-weight: 600; text-align: center;
+  }
+  #banner small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  #toast {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 30;
+    background: #2a1515; border: 1px solid var(--bad); color: #ffd9d4; padding: 8px 14px; border-radius: 8px;
+    max-width: calc(100vw - 32px);
+  }
+  #status { position: fixed; bottom: 10px; left: 12px; z-index: 4; color: #5d6b80; font-size: 12px; }
+
+  /* labels above tanks */
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); text-align: center; white-space: nowrap; }
+  .tag .n { font-size: 11px; font-weight: 600; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+  .tag .bar { width: 46px; height: 4px; margin: 2px auto 0; }
+  .tag .heat { width: 46px; height: 2px; margin: 1px auto 0; background: transparent; }
+  .tag .heat > i { background: var(--bad); }
+
+  /* results */
+  table.results { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.results th, table.results td { padding: 6px 7px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
+  table.results th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--panel-solid); }
+  table.results td:nth-child(2), table.results th:nth-child(2) { text-align: left; }
+  table.results tr:first-child td { color: var(--accent); font-weight: 650; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<div id="labels"></div>
+
+<div id="hud" class="hidden">
+  <div class="title"><b id="h-round">Round –</b><span class="num" id="h-tick">tick 0</span></div>
+  <div class="controls">
+    <button id="b-pause" title="Space">Pause</button>
+    <button id="b-step" title="N">Step</button>
+    <label class="speed">Speed <input id="speed" type="range" min="0" max="200" step="5" value="30" aria-label="Tick delay"><span class="num" id="speed-v">30 ms</span></label>
+    <button id="b-radar" title="R">Radar: on</button>
+    <button id="b-top" title="T">Top-down</button>
+    <button id="b-stop">Stop</button>
+  </div>
+  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radar · <kbd>T</kbd> top-down · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
+</div>
+
+<div id="scoreboard" class="hidden"><h2>Scoreboard</h2><div id="sb-rows"></div></div>
+<div id="banner" class="hidden"></div>
+<div id="toast" class="hidden"></div>
+<div id="status">Connecting…</div>
+
+<!-- Setup -->
+<div id="setup" class="overlay hidden">
+  <div class="dialog" role="dialog" aria-labelledby="setup-title">
+    <header>
+      <h1 id="setup-title">Terra<span>bots</span> battle setup</h1>
+      <p>Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.</p>
+    </header>
+    <div class="body">
+      <div class="setup-grid">
+        <section>
+          <h2>Bots</h2>
+          <div id="bot-list"></div>
+          <div class="add-spec">
+            <input id="add-spec" type="text" placeholder="module:ClassName (e.g. mubot:MuBotBattle)" aria-label="Add bot by spec">
+            <button id="b-add-spec">Add</button>
+          </div>
+        </section>
+        <section id="settings"></section>
+      </div>
+    </div>
+    <footer>
+      <span class="hint" id="setup-summary"></span>
+      <span class="spacer"></span>
+      <input id="toml-file" type="file" accept=".toml,text/plain" class="hidden">
+      <button id="b-load">Load TOML</button>
+      <button id="b-save">Save as TOML</button>
+      <button id="b-start" class="primary">Start battle</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Results -->
+<div id="results" class="overlay hidden">
+  <div class="dialog" role="dialog" aria-labelledby="results-title">
+    <header>
+      <h1 id="results-title">Battle results</h1>
+      <p id="results-sub"></p>
+    </header>
+    <div class="body"><div class="table-wrap"><table class="results" id="results-table"></table></div></div>
+    <footer>
+      <span class="hint" id="results-saved"></span>
+      <span class="spacer"></span>
+      <button id="b-setup">Back to setup</button>
+      <button id="b-again" class="primary">Run again</button>
+    </footer>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const WS_URL = location.protocol.startsWith('http') ? `ws://${location.host}/ws` : 'ws://localhost:8765/ws';
+const $ = (id) => document.getElementById(id);
+
+// ===========================================================================
+// Settings schema (mirrors terrabots/battle/config.py)
+// ===========================================================================
+const FIELDS = [
+  ['Arena', [
+    ['width', 'Width (cells)', 'int', 'Arena width, 16–256 cells.'],
+    ['height', 'Height (cells)', 'int', 'Arena height, 16–256 cells.'],
+    ['terrain', 'Terrain', ['procedural', 'flat'], 'procedural = hills, lakes, rock; flat = classic Robocode arena.'],
+    ['seed', 'Seed', 'int?', 'Same seed → same terrain, spawns and results. Empty = random.'],
+  ]],
+  ['Rounds', [
+    ['rounds', 'Rounds', 'int', '1–1000.'],
+    ['max_ticks_per_round', 'Max ticks / round', 'int', 'Round ends here even with several survivors.'],
+    ['tick_delay_ms', 'Tick delay (ms)', 'int', 'Viewer playback speed; headless ignores it.'],
+  ]],
+  ['Bodies', [
+    ['initial_energy', 'Initial energy', 'float', 'Robocode: 100.'],
+    ['max_velocity', 'Max velocity', 'float', 'cells/tick. Robocode: 8 px/tick = 0.5 cells.'],
+    ['acceleration', 'Acceleration', 'float', 'cells/tick². Robocode: 1 px/tick² = 0.0625.'],
+    ['deceleration', 'Deceleration', 'float', 'cells/tick². Robocode: 2 px/tick² = 0.125.'],
+    ['max_body_turn_deg', 'Body turn (°)', 'float', 'At standstill. Robocode: 10 − 0.75·|v px|.'],
+    ['body_turn_velocity_penalty', 'Turn penalty / speed', 'float', 'Degrees less per px/tick. Robocode: 0.75.'],
+    ['max_gun_turn_deg', 'Gun turn (°)', 'float', 'Per tick. Robocode: 20.'],
+    ['max_radar_turn_deg', 'Radar turn (°)', 'float', 'Per tick. Robocode: 45.'],
+    ['body_radius', 'Body radius', 'float', 'Collision radius in cells.'],
+  ]],
+  ['Gun', [
+    ['min_bullet_power', 'Min power', 'float', 'Robocode: 0.1.'],
+    ['max_bullet_power', 'Max power', 'float', 'Robocode: 3.0.'],
+    ['bullet_speed_fixed', 'Fixed bullet speed', 'float?', 'cells/tick. Empty = Robocode 20 − 3·power px/tick.'],
+    ['max_bullet_speed', 'Max bullet speed', 'float?', 'Cap in cells/tick. Empty = none.'],
+    ['damage_formula', 'Damage formula', ['robocode', 'linear'], 'robocode: 4p (+2(p−1) if p>1); linear: per-power × p.'],
+    ['damage_per_power', 'Damage per power', 'float', 'Used by the linear formula.'],
+    ['max_damage', 'Max damage', 'float?', 'Cap after the formula. Empty = none.'],
+    ['initial_gun_heat', 'Initial gun heat', 'float', 'Robocode: 3 (no shots for ~30 ticks).'],
+    ['gun_cooling_rate', 'Gun cooling / tick', 'float', 'Robocode: 0.1. Heat per shot = 1 + p/5.'],
+    ['hit_energy_return', 'Energy back on hit', ['damage', 'robocode', 'none'], 'damage: shooter gains the damage dealt; robocode: 3·power.'],
+  ]],
+  ['Radar & rules', [
+    ['radar_range', 'Radar range', 'float', 'cells. Robocode: 1200 px = 75 cells.'],
+    ['radar_requires_los', 'Radar needs line of sight', 'bool', 'Hills and rock block radar; stairs give vantage.'],
+    ['ram_damage', 'Ram damage', 'float', 'Robocode: 0.6 to each bot.'],
+    ['comms_enabled', 'Comms enabled', 'bool', 'Range + LOS gated messages between bots.'],
+    ['decide_time_budget_ms', 'decide() budget (ms)', 'float?', 'Slower turns are skipped. Empty = unlimited.'],
+  ]],
+];
+
+// ===========================================================================
+// State
+// ===========================================================================
+let ws = null;
+let availableBots = [];       // [{spec, name, doc, source}]
+let counts = {};              // spec -> count
+let lastConfig = null;        // config dict last shown in the form
+let battleBots = [];          // [{id, name, class}] for the current battle
+let battleConfig = null;
+let paused = false;
+let showRadar = true;
+const radarOff = new Set();   // bot ids with radar hidden individually
+let followId = null;
+let topDown = false;
+let lastStart = null;         // {config, bots} for "Run again"
+
+function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+function toast(text) {
+  const t = $('toast'); t.textContent = text; t.classList.remove('hidden');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 6000);
+}
+
+// ===========================================================================
+// Setup screen
+// ===========================================================================
+function renderSettings(config) {
+  lastConfig = config;
+  const root = $('settings'); root.innerHTML = '<h2>Settings</h2>';
+  for (const [group, fields] of FIELDS) {
+    const fs = document.createElement('fieldset');
+    fs.innerHTML = `<legend>${group}</legend><div class="fields"></div>`;
+    const box = fs.querySelector('.fields');
+    for (const [key, label, type, tip] of fields) {
+      const f = document.createElement('div');
+      const id = `cfg-${key}`;
+      const v = config[key];
+      if (type === 'bool') {
+        f.className = 'field check';
+        f.innerHTML = `<input type="checkbox" id="${id}" ${v ? 'checked' : ''}><label for="${id}" title="${tip}">${label}</label>`;
+      } else if (Array.isArray(type)) {
+        f.className = 'field';
+        f.innerHTML = `<label for="${id}" title="${tip}">${label}</label><select id="${id}">${type.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+      } else {
+        f.className = 'field';
+        const step = type.startsWith('int') ? '1' : 'any';
+        f.innerHTML = `<label for="${id}" title="${tip}">${label}</label><input type="number" step="${step}" id="${id}" class="num" value="${v ?? ''}" placeholder="${type.endsWith('?') ? 'none' : ''}">`;
+      }
+      f.dataset.key = key; f.dataset.type = Array.isArray(type) ? 'choice' : type;
+      box.appendChild(f);
+    }
+    root.appendChild(fs);
+  }
+}
+
+function readSettings() {
+  const out = { ...(lastConfig || {}) };
+  for (const f of document.querySelectorAll('#settings .field')) {
+    const key = f.dataset.key, type = f.dataset.type;
+    const el = f.querySelector('input, select');
+    if (type === 'bool') out[key] = el.checked;
+    else if (type === 'choice') out[key] = el.value;
+    else {
+      const raw = el.value.trim();
+      if (raw === '') { if (type.endsWith('?')) out[key] = null; continue; }
+      out[key] = type.startsWith('int') ? parseInt(raw, 10) : parseFloat(raw);
+    }
+  }
+  return out;
+}
+
+function renderBots() {
+  const list = $('bot-list'); list.innerHTML = '';
+  const groups = { yours: 'Your bots (bots/)', extra: 'Extra bots', 'built-in': 'Built-in demo bots' };
+  for (const [src, title] of Object.entries(groups)) {
+    const bots = availableBots.filter(b => b.source === src);
+    if (!bots.length) continue;
+    const g = document.createElement('div'); g.className = 'bot-group';
+    g.innerHTML = `<h2>${title}</h2>`;
+    for (const b of bots) {
+      const n = counts[b.spec] || 0;
+      const row = document.createElement('div');
+      row.className = 'bot-row' + (n ? ' active' : '');
+      row.innerHTML = `<div><div class="bot-name">${b.name}</div><div class="bot-doc">${b.doc || ''}</div><div class="bot-spec">${b.spec}</div></div>
+        <div class="counter"><button aria-label="Fewer ${b.name}">−</button><span class="num">${n}</span><button aria-label="More ${b.name}">+</button></div>`;
+      const [minus, plus] = row.querySelectorAll('button');
+      minus.onclick = () => { counts[b.spec] = Math.max(0, n - 1); renderBots(); };
+      plus.onclick = () => { counts[b.spec] = Math.min(50, n + 1); renderBots(); };
+      g.appendChild(row);
+    }
+    list.appendChild(g);
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  $('setup-summary').textContent = `${total} bot${total === 1 ? '' : 's'} selected`;
+  $('b-start').disabled = total < 2;
+}
+
+function applyBattleFile(config, bots) {
+  renderSettings(config);
+  counts = {};
+  for (const b of bots) {
+    counts[b.spec] = (counts[b.spec] || 0) + b.count;
+    if (!availableBots.some(a => a.spec === b.spec)) {
+      availableBots.push({ spec: b.spec, name: b.spec.split(':')[1] || b.spec, doc: '', source: 'extra' });
+    }
+  }
+  renderBots();
+}
+
+function selectedBots() {
+  return Object.entries(counts).filter(([, n]) => n > 0).map(([spec, count]) => ({ spec, count }));
+}
+
+function toToml(config, bots) {
+  const val = (v) => typeof v === 'string' ? JSON.stringify(v) : typeof v === 'boolean' ? String(v) : String(v);
+  const lines = ['# Terrabots battle file: terrabots-battle this.toml'];
+  for (const [k, v] of Object.entries(config)) lines.push(v === null ? `# ${k} = (unset)` : `${k} = ${val(v)}`);
+  for (const b of bots) lines.push('', '[[bots]]', `spec = ${JSON.stringify(b.spec)}`, `count = ${b.count}`);
+  return lines.join('\n') + '\n';
+}
+
+function showSetup() {
+  $('results').classList.add('hidden');
+  $('setup').classList.remove('hidden');
+}
+
+$('b-start').onclick = () => {
+  lastStart = { config: readSettings(), bots: selectedBots() };
+  send({ type: 'start_battle', ...lastStart });
+};
+$('b-save').onclick = () => {
+  const blob = new Blob([toToml(readSettings(), selectedBots())], { type: 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'battle.toml'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('b-load').onclick = () => $('toml-file').click();
+$('toml-file').onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  send({ type: 'parse_toml', text: await file.text() });
+  e.target.value = '';
+};
+$('b-add-spec').onclick = () => {
+  const spec = $('add-spec').value.trim();
+  if (!/^[\w.]+:\w+$/.test(spec)) { toast('Spec must look like module:ClassName'); return; }
+  if (!availableBots.some(b => b.spec === spec)) availableBots.push({ spec, name: spec.split(':')[1], doc: 'added by spec, checked when the battle starts', source: 'extra' });
+  counts[spec] = (counts[spec] || 0) + 1; $('add-spec').value = ''; renderBots();
+};
+$('b-setup').onclick = showSetup;
+$('b-again').onclick = () => { if (lastStart) send({ type: 'start_battle', ...lastStart }); };
+
+// ===========================================================================
+// Three.js scene
+// ===========================================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1018);
+scene.fog = new THREE.Fog(0x0b1018, 90, 220);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 45, 50);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.47;
+
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2416, 1.6));
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
+sun.position.set(-30, 60, 25);
+scene.add(sun);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// World coordinates: x east, y north (0,0 = south-west). Three: x east, -z north.
+let W = 0, H = 0, elevation = null, terrainMesh = null;
+const toScene = (x, y, z = 0) => new THREE.Vector3(x - W / 2, z, H / 2 - y);
+const headingRad = (deg) => -THREE.MathUtils.degToRad(deg);   // rotation.y for a model facing -z
+
+function decode(b64, Type) {
+  const bin = atob(b64); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Type(bytes.buffer);
+}
+
+function cellColor(code, elev, depth) {
+  const c = new THREE.Color();
+  if (code === 2) return c.setHSL(0.58, 0.55, 0.30 + Math.min(depth / 3, 1) * 0.08);      // water
+  if (code === 1) return c.setHSL(0.08, 0.06, 0.34 + Math.min(elev / 8, 1) * 0.22);         // rock
+  if (code === 3) return c.setHSL(0.11, 0.42, 0.45);                                        // stairs
+  return c.setHSL(0.27 - Math.min(elev / 6, 1) * 0.08, 0.38, 0.24 + Math.min(elev / 6, 1) * 0.14);  // plain
+}
+
+function buildTerrain(world) {
+  if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
+  W = world.width; H = world.height;
+  elevation = decode(world.elevation, Float32Array);
+  const codes = decode(world.terrain, Uint8Array);
+  const depth = decode(world.water_depth, Float32Array);
+  const elevAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : elevation[y * W + x];
+
+  const pos = [], col = [];
+  const quad = (a, b, c, d, color) => {
+    pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+    for (let i = 0; i < 6; i++) col.push(color.r, color.g, color.b);
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, h = elevation[i];
+    const color = cellColor(codes[i], h, depth[i]);
+    const x0 = x - W / 2, x1 = x0 + 1, z0 = H / 2 - y, z1 = z0 - 1;   // z1 is north edge
+    quad([x0, h, z0], [x1, h, z0], [x1, h, z1], [x0, h, z1], color);
+    const side = color.clone().multiplyScalar(0.62);
+    // Only draw walls down to the lower neighbour; hidden faces are skipped.
+    const sides = [[x, y - 1, [x0, z0], [x1, z0]], [x, y + 1, [x1, z1], [x0, z1]],
+                   [x - 1, y, [x0, z1], [x0, z0]], [x + 1, y, [x1, z0], [x1, z1]]];
+    for (const [nx, ny, [ax, az], [bx, bz]] of sides) {
+      const nh = elevAt(nx, ny);
+      if (nh < h - 1e-3) quad([ax, nh, az], [bx, nh, bz], [bx, h, bz], [ax, h, az], side);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  terrainMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  scene.add(terrainMesh);
+
+  // Arena floor frame so the edge is visible on flat maps.
+  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, 0.02, H)),
+                                       new THREE.LineBasicMaterial({ color: 0x3a4b68 }));
+  frame.position.y = 0.01; terrainMesh.add(frame);
+}
+
+function groundAt(x, y) {
+  const cx = Math.floor(x), cy = Math.floor(y);
+  if (!elevation || cx < 0 || cy < 0 || cx >= W || cy >= H) return 0;
+  return elevation[cy * W + cx];
+}
+
+// ---------------------------------------------------------------------------
+// Tanks: hull, turret+barrel (gun heading) and radar dish (radar heading), each
+// rotated independently so the three Robocode headings are visible.
+// ---------------------------------------------------------------------------
+const tanks = new Map();   // id -> {root, hull, turret, radar, color, tag, wedges[], state}
+const botColor = (id) => new THREE.Color().setHSL((id * 0.137 + 0.03) % 1, 0.7, 0.56);
+
+function makeTank(bot) {
+  const color = botColor(bot.id);
+  const dark = color.clone().multiplyScalar(0.55);
+  const mat = (c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+  const root = new THREE.Group();
+
+  const hull = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.22, 0.86), mat(color));
+  body.position.y = 0.2; hull.add(body);
+  for (const sx of [-0.36, 0.36]) {
+    const track = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.94), mat(0x1c2230));
+    track.position.set(sx, 0.11, 0); hull.add(track);
+  }
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.12), mat(dark));
+  nose.position.set(0, 0.3, -0.42); hull.add(nose);    // marks body heading
+  root.add(hull);
+
+  const turret = new THREE.Group(); turret.position.y = 0.31;
+  const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.16, 7), mat(dark));
+  dome.position.y = 0.08; turret.add(dome);
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.56), mat(0x2b3242));
+  barrel.position.set(0, 0.09, -0.36); turret.add(barrel);
+  root.add(turret);
+
+  const radar = new THREE.Group(); radar.position.y = 0.52;
+  const dish = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.07, 0.05), mat(0xe8eef8));
+  dish.position.z = -0.04; radar.add(dish);
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.04), mat(0x8090a8));
+  post.position.y = -0.05; radar.add(post);
+  root.add(radar);
+
+  root.traverse(o => { if (o.isMesh) o.userData.botId = bot.id; });
+  scene.add(root);
+
+  const tag = document.createElement('div'); tag.className = 'tag';
+  tag.innerHTML = `<div class="n" style="color:#${color.getHexString()}">${bot.name}</div><div class="bar"><i></i></div><div class="bar heat"><i></i></div>`;
+  $('labels').appendChild(tag);
+  return { root, hull, turret, radar, color, tag, wedges: [], state: 'alive', data: null };
+}
+
+function clearBattle() {
+  for (const t of tanks.values()) {
+    scene.remove(t.root); t.tag.remove();
+    for (const w of t.wedges) { scene.remove(w); w.geometry.dispose(); }
+  }
+  tanks.clear();
+  for (const b of bulletMeshes.values()) scene.remove(b.mesh, b.trail);
+  bulletMeshes.clear();
+  for (const fx of effects) scene.remove(fx.obj);
+  effects.length = 0;
+}
+
+// Radar wedge from radar_prev to radar (shortest way), with a short fading trail.
+const RADAR_TRAIL = 5;
+function radarWedge(t, bot) {
+  const range = battleConfig ? battleConfig.radar_range : 25;
+  let sweep = ((bot.radar - bot.radar_prev + 540) % 360) - 180;
+  if (Math.abs(sweep) < 1.5) sweep = sweep < 0 ? -1.5 : 1.5;   // keep a locked radar visible
+  const steps = Math.max(2, Math.ceil(Math.abs(sweep) / 4));
+  const verts = [0, 0, 0];
+  for (let i = 0; i <= steps; i++) {
+    const a = THREE.MathUtils.degToRad(bot.radar_prev + sweep * i / steps);
+    verts.push(Math.sin(a) * range, 0, -Math.cos(a) * range);
+  }
+  const idx = [];
+  for (let i = 1; i <= steps; i++) idx.push(0, i, i + 1);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: t.color, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
+  mesh.position.copy(toScene(bot.x, bot.y, bot.z + 0.6));
+  scene.add(mesh);
+  t.wedges.unshift(mesh);
+  while (t.wedges.length > RADAR_TRAIL) { const old = t.wedges.pop(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
+  t.wedges.forEach((w, i) => { w.material.opacity = 0.14 * (1 - i / RADAR_TRAIL); });
+}
+
+function updateTanks(frame) {
+  for (const bot of frame.bots) {
+    const t = tanks.get(bot.id); if (!t) continue;
+    t.data = bot;
+    t.root.position.copy(toScene(bot.x, bot.y, bot.z));
+    t.hull.rotation.y = headingRad(bot.heading);
+    t.turret.rotation.y = headingRad(bot.gun);
+    t.radar.rotation.y = headingRad(bot.radar);
+    const fr = Math.max(0, Math.min(1, bot.energy / (battleConfig?.initial_energy || 100)));
+    const bar = t.tag.querySelector('.bar > i');
+    bar.style.width = `${fr * 100}%`;
+    bar.style.background = `hsl(${fr * 120}, 70%, 50%)`;
+    t.tag.querySelector('.heat > i').style.width = `${Math.min(1, bot.gun_heat / 1.6) * 100}%`;
+
+    if (bot.state === 'dead' && t.state !== 'dead') {
+      t.root.traverse(o => {
+        if (!o.isMesh) return;
+        o.material = o.material.clone();
+        o.material.color.setHex(0x2a2d33);   // wreck stays on the field
+      });
+      t.tag.classList.add('hidden');
+      burst(bot.x, bot.y, bot.z + 0.4, 0xff8a3d, 1.6, 0.7);
+    }
+    t.state = bot.state;
+    const radarVisible = showRadar && bot.state === 'alive' && !radarOff.has(bot.id);
+    if (radarVisible) radarWedge(t, bot);
+    else if (t.wedges.length) { for (const w of t.wedges) { scene.remove(w); w.geometry.dispose(); } t.wedges = []; }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bullets and effects
+// ---------------------------------------------------------------------------
+const bulletMeshes = new Map();   // id -> {mesh, trail, prev}
+const BULLET_GEO = new THREE.SphereGeometry(1, 8, 6);
+const effects = [];               // {obj, life, max, grow}
+
+function updateBullets(frame) {
+  const seen = new Set();
+  for (const b of frame.bullets) {
+    seen.add(b.id);
+    let e = bulletMeshes.get(b.id);
+    const p = toScene(b.x, b.y, b.z);
+    if (!e) {
+      const color = tanks.get(b.shooter)?.color || new THREE.Color(0xffd166);
+      const mesh = new THREE.Mesh(BULLET_GEO, new THREE.MeshBasicMaterial({ color: 0xfff3c4 }));
+      mesh.scale.setScalar(0.06 + b.power * 0.03);
+      const trailGeo = new THREE.BufferGeometry().setFromPoints([p, p]);
+      const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 }));
+      scene.add(mesh, trail);
+      e = { mesh, trail, prev: p.clone() };
+      bulletMeshes.set(b.id, e);
+    }
+    e.mesh.position.copy(p);
+    // Tracer: three ticks of flight behind the bullet.
+    const back = p.clone().lerp(e.prev, 3);
+    e.trail.geometry.setFromPoints([back, p]);
+    e.prev.copy(p);
+  }
+  for (const [id, e] of bulletMeshes) {
+    if (!seen.has(id)) { scene.remove(e.mesh, e.trail); e.trail.geometry.dispose(); bulletMeshes.delete(id); }
+  }
+}
+
+function burst(x, y, z, color, size, life) {
+  const obj = new THREE.Mesh(BULLET_GEO, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
+  obj.position.copy(toScene(x, y, z)); obj.scale.setScalar(0.1);
+  scene.add(obj); effects.push({ obj, life, max: life, grow: size });
+}
+
+function scanLine(fromId, toId) {
+  const a = tanks.get(fromId)?.data, b = tanks.get(toId)?.data; if (!a || !b) return;
+  const geo = new THREE.BufferGeometry().setFromPoints([toScene(a.x, a.y, a.z + 0.6), toScene(b.x, b.y, b.z + 0.4)]);
+  const obj = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: tanks.get(fromId).color, transparent: true, opacity: 0.7 }));
+  scene.add(obj); effects.push({ obj, life: 0.18, max: 0.18, grow: 0 });
+}
+
+function handleEvents(frame) {
+  for (const e of frame.events) {
+    if (e.type === 'bullet_hit') burst(e.x, e.y, e.z, 0xffd166, 0.9, 0.35);
+    else if (e.type === 'bullet_missed' && e.reason === 'terrain') burst(e.x, e.y, Math.max(e.z - 0.2, groundAt(e.x, e.y)), 0x9aa3ad, 0.5, 0.5);
+    else if (e.type === 'scan' && showRadar && !radarOff.has(e.bot)) scanLine(e.bot, e.target);
+  }
+}
+
+function tickEffects(dt) {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const fx = effects[i]; fx.life -= dt;
+    const k = 1 - fx.life / fx.max;
+    if (fx.grow) fx.obj.scale.setScalar(0.1 + fx.grow * k);
+    fx.obj.material.opacity = Math.max(0, 0.9 * (1 - k));
+    if (fx.life <= 0) { scene.remove(fx.obj); if (fx.obj.isLine) fx.obj.geometry.dispose(); effects.splice(i, 1); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HUD, scoreboard, labels
+// ---------------------------------------------------------------------------
+function renderScoreboard(frame) {
+  const rows = frame.bots.map(b => ({ ...b, total: frame.totals?.[b.id] ?? 0 }))
+    .sort((a, b) => (a.state === 'dead') - (b.state === 'dead') || b.total - a.total);
+  $('sb-rows').innerHTML = rows.map(b => {
+    const c = tanks.get(b.id)?.color.getHexString() || 'fff';
+    const fr = Math.max(0, Math.min(1, b.energy / (battleConfig?.initial_energy || 100)));
+    return `<div class="sb-row${b.state === 'dead' ? ' dead' : ''}${followId === b.id ? ' followed' : ''}" data-id="${b.id}">
+      <span class="sw" style="background:#${c}"></span><span class="nm" title="${b.name}">${b.name}</span>
+      <span class="bar"><i style="width:${fr * 100}%;background:hsl(${fr * 120},70%,50%)"></i></span>
+      <span class="sc num">${Math.round(b.total)}</span></div>`;
+  }).join('');
+}
+$('sb-rows').addEventListener('click', (e) => {
+  const row = e.target.closest('.sb-row'); if (!row) return;
+  const id = Number(row.dataset.id);
+  followId = followId === id ? null : id;
+});
+
+function placeLabels() {
+  const half = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  for (const t of tanks.values()) {
+    if (!t.data || t.state === 'dead') continue;
+    const p = toScene(t.data.x, t.data.y, t.data.z + 1.1).project(camera);
+    const visible = p.z < 1;
+    t.tag.style.display = visible ? '' : 'none';
+    t.tag.style.left = `${p.x * half.x + half.x}px`;
+    t.tag.style.top = `${-p.y * half.y + half.y}px`;
+  }
+}
+
+function banner(html, ms = 1400) {
+  const b = $('banner'); b.innerHTML = html; b.classList.remove('hidden');
+  clearTimeout(banner._t); banner._t = setTimeout(() => b.classList.add('hidden'), ms);
+}
+
+function setPaused(p) { paused = p; $('b-pause').textContent = p ? 'Resume' : 'Pause'; }
+$('b-pause').onclick = () => send({ type: paused ? 'resume' : 'pause' });
+$('b-step').onclick = () => { setPaused(true); send({ type: 'step' }); };
+$('b-stop').onclick = () => send({ type: 'stop_battle' });
+$('speed').oninput = (e) => { $('speed-v').textContent = `${e.target.value} ms`; send({ type: 'set_speed', tick_delay_ms: Number(e.target.value) }); };
+$('b-radar').onclick = () => toggleRadar();
+$('b-top').onclick = () => toggleTopDown();
+
+function toggleRadar() { showRadar = !showRadar; $('b-radar').textContent = `Radar: ${showRadar ? 'on' : 'off'}`; }
+function toggleTopDown() {
+  topDown = !topDown;
+  // Distance at which the whole arena fits the vertical field of view, plus margin.
+  const fit = (Math.max(W, H) / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const r = fit * Math.max(1.1, 1.15 / Math.min(1, camera.aspect));
+  followId = null;
+  controls.target.set(0, 0, 0);
+  if (topDown) camera.position.set(0, r, 0.01);
+  else camera.position.set(0, r * 0.72, r * 0.62);
+}
+function resetCamera() { topDown = true; toggleTopDown(); }
+
+window.addEventListener('keydown', (e) => {
+  if (!$('setup').classList.contains('hidden') || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); $('b-pause').click(); }
+  else if (e.key === 'n' || e.key === 'N') $('b-step').click();
+  else if (e.key === 'r' || e.key === 'R') toggleRadar();
+  else if (e.key === 't' || e.key === 'T') toggleTopDown();
+  else if (e.key === 'Escape') followId = null;
+});
+
+// Click a tank: follow it; click it again: toggle its radar wedge.
+const raycaster = new THREE.Raycaster(); let downAt = null;
+renderer.domElement.addEventListener('pointerdown', (e) => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+  const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects([...tanks.values()].map(t => t.root), true)[0];
+  if (!hit) return;
+  const id = hit.object.userData.botId;
+  if (followId === id) { radarOff.has(id) ? radarOff.delete(id) : radarOff.add(id); }
+  else followId = id;
+});
+
+// ---------------------------------------------------------------------------
+// Results
+// ---------------------------------------------------------------------------
+const RESULT_COLS = [['rank', '#'], ['name', 'Bot'], ['total', 'Total'], ['survival', 'Survival'],
+  ['last_survivor', 'Last surv.'], ['bullet_damage', 'Bullet dmg'], ['bullet_kill_bonus', 'Bullet bonus'],
+  ['ram_damage', 'Ram dmg'], ['ram_kill_bonus', 'Ram bonus'], ['firsts', '1st'], ['seconds', '2nd'],
+  ['thirds', '3rd'], ['hit_rate', 'Hits'], ['avg_end_energy', 'End energy'], ['skipped_turns', 'Skipped']];
+
+function showResults(msg) {
+  const fmt = (k, v) => k === 'hit_rate' ? `${(v * 100).toFixed(1)}%` : typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(1) : v;
+  $('results-table').innerHTML =
+    `<thead><tr>${RESULT_COLS.map(([, h]) => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
+    msg.results.map(r => `<tr>${RESULT_COLS.map(([k]) => `<td class="${k === 'name' ? '' : 'num'}">${fmt(k, r[k])}</td>`).join('')}</tr>`).join('') +
+    '</tbody>';
+  const c = msg.config;
+  $('results-sub').textContent = `${c.rounds} rounds · ${c.width}×${c.height} ${c.terrain} · seed ${c.seed ?? 'random'} · energy return: ${c.hit_energy_return}`;
+  $('results-saved').textContent = msg.saved_to ? `Saved to ${msg.saved_to}` : '';
+  lastStart = { config: msg.config, bots: msg.bots };
+  $('results').classList.remove('hidden');
+}
+
+// ===========================================================================
+// WebSocket
+// ===========================================================================
+function connect() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => { $('status').textContent = 'Connected'; };
+  ws.onclose = () => { $('status').textContent = 'Disconnected, retrying…'; setTimeout(connect, 2000); };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    switch (msg.type) {
+      case 'hello':
+        availableBots = msg.bots;
+        applyBattleFile(msg.defaults.config, msg.defaults.bots);
+        lastStart = { config: msg.defaults.config, bots: msg.defaults.bots };
+        $('speed').value = msg.tick_delay_ms; $('speed-v').textContent = `${msg.tick_delay_ms} ms`;
+        setPaused(msg.paused);
+        if (!msg.running) showSetup();
+        break;
+      case 'bot_list': availableBots = msg.bots; renderBots(); break;
+      case 'toml_parsed': applyBattleFile(msg.config, msg.bots); break;
+      case 'error': toast(msg.message); break;
+      case 'paused': setPaused(msg.paused); break;
+      case 'round_start': {
+        $('setup').classList.add('hidden'); $('results').classList.add('hidden');
+        $('hud').classList.remove('hidden'); $('scoreboard').classList.remove('hidden');
+        const firstRound = msg.round === 1 || !terrainMesh;
+        battleConfig = msg.config; battleBots = msg.bots;
+        clearBattle();
+        buildTerrain(msg.world);
+        for (const b of msg.bots) tanks.set(b.id, makeTank(b));
+        if (firstRound) { followId = null; resetCamera(); }
+        $('h-round').textContent = `Round ${msg.round} / ${msg.rounds}`;
+        $('speed').value = msg.config.tick_delay_ms; $('speed-v').textContent = `${msg.config.tick_delay_ms} ms`;
+        banner(`Round ${msg.round} <small>of ${msg.rounds}</small>`, 1000);
+        break;
+      }
+      case 'tick':
+        $('h-tick').textContent = `tick ${msg.tick}`;
+        updateTanks(msg); updateBullets(msg); handleEvents(msg); renderScoreboard(msg);
+        break;
+      case 'round_end': {
+        const top = msg.ranking[0];
+        const head = msg.survivors === 1 ? `Round ${msg.round}: ${top.name} wins`
+                                         : `Round ${msg.round}: time limit, ${top.name} leads`;
+        banner(`${head} <small>${msg.round < msg.rounds ? 'next round starting…' : 'battle over'}</small>`, 1500);
+        break;
+      }
+      case 'battle_end': setTimeout(() => showResults(msg), 900); break;
+      case 'stopped':
+        clearBattle(); $('hud').classList.add('hidden'); $('scoreboard').classList.add('hidden'); showSetup();
+        break;
+    }
+  };
+}
+connect();
+
+// ===========================================================================
+// Render loop
+// ===========================================================================
+let lastT = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  if (followId !== null) {
+    const d = tanks.get(followId)?.data;
+    if (d) {
+      const target = toScene(d.x, d.y, d.z);
+      const delta = target.clone().sub(controls.target).multiplyScalar(0.12);
+      controls.target.add(delta); camera.position.add(delta);
+    }
+  }
+  controls.update();
+  tickEffects(dt);
+  renderer.render(scene, camera);
+  placeLabels();
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

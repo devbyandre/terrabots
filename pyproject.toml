@@ -37,13 +37,14 @@ ml = [
 
 [project.scripts]
 terrabots-run = "terrabots.run:main"
+terrabots-battle = "terrabots.battle.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["terrabots*"]
 
 [tool.setuptools.package-data]
-"terrabots.viewer" = ["index.html"]
+"terrabots.viewer" = ["index.html", "battle.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

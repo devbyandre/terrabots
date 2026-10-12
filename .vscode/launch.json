@@ -36,6 +36,26 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Terrabots: Battle with viewer (setup screen)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "terrabots.battle.cli",
+      "args": ["battles/example.toml"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Terrabots: Battle headless (results table)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "terrabots.battle.cli",
+      "args": ["battles/example.toml", "--headless"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
       "name": "Terrabots: Debug current test file",
       "type": "debugpy",
       "request": "launch",

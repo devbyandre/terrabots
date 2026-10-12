@@ -208,6 +208,8 @@ class BattleRunner:
                 self.step()
             ranking = self.end_round()
             if verbose:
-                print(f"Round {self.round}/{self.config.rounds}: {arena.tick} ticks, "
-                      f"winner {ranking[0]['name']}")
+                standing = len(arena.standing())
+                outcome = (f"winner {ranking[0]['name']}" if standing == 1 else
+                           f"time limit, {standing} left, leader {ranking[0]['name']}")
+                print(f"Round {self.round}/{self.config.rounds}: {arena.tick} ticks, {outcome}")
         return self.results()

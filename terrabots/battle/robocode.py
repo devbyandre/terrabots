@@ -30,12 +30,15 @@ Differences to know about:
   bullet_id is filled in when the engine confirms the shot next tick.
 - Like setAhead in Robocode, hitting a wall or another bot clears the distance
   remaining.
+- on_move_complete / on_turn_complete / on_gun_turn_complete /
+  on_radar_turn_complete behave like Robocode's built-in custom conditions: they
+  fire on every tick on which nothing of that kind is queued, not just once.
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from terrabots.battle.actions import BattleAction
 from terrabots.battle.agent import BattleAgent
@@ -131,7 +134,6 @@ class _Queue:
     radar_turn: float = 0.0
     fire: float = 0.0
     max_velocity: float = math.inf
-    completed: set[str] = field(default_factory=set)
 
 
 class AdvancedRobot(BattleAgent):
@@ -273,19 +275,18 @@ class AdvancedRobot(BattleAgent):
         own_gun = gun - (0.0 if self.adjust_gun_for_body_turn else body)
         own_radar = radar - (0.0 if self.adjust_radar_for_gun_turn else gun)
 
-        def consume(remaining: float, done: float, event: str) -> float:
+        def consume(remaining: float, done: float) -> float:
             if remaining == 0:
                 return 0.0
             left = remaining - done
             if abs(left) < 1e-6 or (left > 0) != (remaining > 0):
-                q.completed.add(event)
                 return 0.0
             return left
 
-        q.body_turn = consume(q.body_turn, body, "turn")
-        q.gun_turn = consume(q.gun_turn, own_gun, "gun")
-        q.radar_turn = consume(q.radar_turn, own_radar, "radar")
-        q.distance = consume(q.distance, obs.velocity, "move")
+        q.body_turn = consume(q.body_turn, body)
+        q.gun_turn = consume(q.gun_turn, own_gun)
+        q.radar_turn = consume(q.radar_turn, own_radar)
+        q.distance = consume(q.distance, obs.velocity)
         if obs.hit_wall or any(h.my_fault for h in obs.hit_bot):
             q.distance = 0.0
 
@@ -338,12 +339,17 @@ class AdvancedRobot(BattleAgent):
                 s.name, s.bot_id, rel(s.bearing), s.bearing, s.distance, s.heading,
                 s.velocity, s.energy, s.elevation))
 
-        completed, self._q.completed = self._q.completed, set()
-        handlers = {"move": self.on_move_complete, "turn": self.on_turn_complete,
-                    "gun": self.on_gun_turn_complete, "radar": self.on_radar_turn_complete}
-        for name in ("move", "turn", "gun", "radar"):
-            if name in completed:
-                handlers[name]()
+        # Robocode's MoveCompleteCondition & co. are tested every tick, so like
+        # there they fire on every tick on which nothing of that kind is queued.
+        q = self._q
+        if q.distance == 0:
+            self.on_move_complete()
+        if q.body_turn == 0:
+            self.on_turn_complete()
+        if q.gun_turn == 0:
+            self.on_gun_turn_complete()
+        if q.radar_turn == 0:
+            self.on_radar_turn_complete()
 
     def _action(self) -> BattleAction:
         q = self._q

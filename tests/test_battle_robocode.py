@@ -38,7 +38,8 @@ def test_radar_turn_runs_over_several_ticks_and_reports_completion() -> None:
                 self.set_turn_radar_right(360)
 
         def on_radar_turn_complete(self):
-            Spinner.done_at = self.time
+            if self.time > 1 and Spinner.done_at is None:   # level-triggered, like Robocode
+                Spinner.done_at = self.time
 
     arena = arena_with(Spinner())
     for _ in range(12):

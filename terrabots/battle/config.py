@@ -47,7 +47,9 @@ _RANGES: dict[str, tuple[float | None, float | None]] = {
     "body_turn_velocity_penalty": (0, None),
     "max_gun_turn_deg": (0, 180),
     "max_radar_turn_deg": (0, 180),
-    "body_radius": (0.05, 2),
+    "body_half_width": (0.05, 4),
+    "inactivity_time": (0, None),
+    "inactivity_energy_drain": (0, None),
     "min_bullet_power": (0.01, None),
     "max_bullet_power": (0.01, None),
     "bullet_speed_fixed": (0.01, 10),
@@ -94,7 +96,7 @@ class BattleConfig:
     body_turn_velocity_penalty: float = 0.75        # deg less per px/tick of speed
     max_gun_turn_deg: float = 20.0
     max_radar_turn_deg: float = 45.0
-    body_radius: float = 0.45
+    body_half_width: float = 18 / PX_PER_CELL       # Robocode bots are 36x36 px squares
 
     # --- Gun ---
     min_bullet_power: float = 0.1
@@ -115,6 +117,11 @@ class BattleConfig:
 
     # --- Collisions ---
     ram_damage: float = 0.6
+    bullet_collisions: bool = True           # bullets that cross each other both vanish
+
+    # --- Stalemates ---
+    inactivity_time: int = 450               # ticks without damage before the drain starts
+    inactivity_energy_drain: float = 0.1     # energy every bot loses per tick while inactive
 
     # --- Mode ---
     comms_enabled: bool = True

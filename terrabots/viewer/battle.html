@@ -96,6 +96,7 @@
   #hud .title { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
   #hud .title b { font-size: 15px; }
   #hud .title .num { color: var(--muted); }
+  .badge { font-size: 11px; color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 1px 6px; }
   #hud .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   #hud .controls button { padding: 4px 10px; }
   #hud .speed { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
@@ -156,7 +157,7 @@
 <div id="labels"></div>
 
 <div id="hud" class="hidden">
-  <div class="title"><b id="h-round">Round –</b><span class="num" id="h-tick">tick 0</span></div>
+  <div class="title"><b id="h-round">Round –</b><span class="num" id="h-tick">tick 0</span><span id="h-inactive" class="badge hidden" title="No damage for a while: every bot loses energy each tick (Robocode inactivity rule)">inactivity drain</span></div>
   <div class="controls">
     <button id="b-pause" title="Space">Pause</button>
     <button id="b-step" title="N">Step</button>
@@ -165,7 +166,7 @@
     <button id="b-top" title="T">Top-down</button>
     <button id="b-stop">Stop</button>
   </div>
-  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radar · <kbd>T</kbd> top-down · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
+  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radar · <kbd>T</kbd> top-down · <kbd>D</kbd> debug drawings · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
 </div>
 
 <div id="scoreboard" class="hidden"><h2>Scoreboard</h2><div id="sb-rows"></div></div>
@@ -259,7 +260,7 @@ const FIELDS = [
     ['body_turn_velocity_penalty', 'Turn penalty / speed', 'float', 'Degrees less per px/tick. Robocode: 0.75.'],
     ['max_gun_turn_deg', 'Gun turn (°)', 'float', 'Per tick. Robocode: 20.'],
     ['max_radar_turn_deg', 'Radar turn (°)', 'float', 'Per tick. Robocode: 45.'],
-    ['body_radius', 'Body radius', 'float', 'Collision radius in cells.'],
+    ['body_half_width', 'Body half width', 'float', 'Square hitbox, cells. Robocode: 36 px = 2.25 cells wide.'],
   ]],
   ['Gun', [
     ['min_bullet_power', 'Min power', 'float', 'Robocode: 0.1.'],
@@ -277,6 +278,9 @@ const FIELDS = [
     ['radar_range', 'Radar range', 'float', 'cells. Robocode: 1200 px = 75 cells.'],
     ['radar_requires_los', 'Radar needs line of sight', 'bool', 'Hills and rock block radar; stairs give vantage.'],
     ['ram_damage', 'Ram damage', 'float', 'Robocode: 0.6 to each bot.'],
+    ['bullet_collisions', 'Bullets collide', 'bool', 'Robocode: bullets that cross each other both vanish.'],
+    ['inactivity_time', 'Inactivity time', 'int', 'Ticks without damage before everyone drains. Robocode: 450.'],
+    ['inactivity_energy_drain', 'Inactivity drain', 'float', 'Energy per tick while inactive. Robocode: 0.1.'],
     ['comms_enabled', 'Comms enabled', 'bool', 'Range + LOS gated messages between bots.'],
     ['decide_time_budget_ms', 'decide() budget (ms)', 'float?', 'Slower turns are skipped. Empty = unlimited.'],
   ]],
@@ -532,6 +536,7 @@ function groundAt(x, y) {
 // rotated independently so the three Robocode headings are visible.
 // ---------------------------------------------------------------------------
 const tanks = new Map();   // id -> {root, hull, turret, radar, color, tag, wedges[], state}
+const tankScale = () => (battleConfig?.body_half_width ?? 0.47) / 0.47;
 const botColor = (id) => new THREE.Color().setHSL((id * 0.137 + 0.03) % 1, 0.7, 0.56);
 
 function makeTank(bot) {
@@ -566,6 +571,7 @@ function makeTank(bot) {
   root.add(radar);
 
   root.traverse(o => { if (o.isMesh) o.userData.botId = bot.id; });
+  root.scale.setScalar(tankScale());   // model is built for a 0.47-cell half width
   scene.add(root);
 
   const tag = document.createElement('div'); tag.className = 'tag';
@@ -575,6 +581,7 @@ function makeTank(bot) {
 }
 
 function clearBattle() {
+  clearDrawings();
   for (const t of tanks.values()) {
     scene.remove(t.root); t.tag.remove();
     for (const w of t.wedges) { scene.remove(w); w.geometry.dispose(); }
@@ -692,6 +699,7 @@ function scanLine(fromId, toId) {
 function handleEvents(frame) {
   for (const e of frame.events) {
     if (e.type === 'bullet_hit') burst(e.x, e.y, e.z, 0xffd166, 0.9, 0.35);
+    else if (e.type === 'bullet_hit_bullet') burst(e.x, e.y, e.z, 0xffffff, 0.6, 0.3);
     else if (e.type === 'bullet_missed' && e.reason === 'terrain') burst(e.x, e.y, Math.max(e.z - 0.2, groundAt(e.x, e.y)), 0x9aa3ad, 0.5, 0.5);
     else if (e.type === 'scan' && showRadar && !radarOff.has(e.bot)) scanLine(e.bot, e.target);
   }
@@ -704,6 +712,50 @@ function tickEffects(dt) {
     if (fx.grow) fx.obj.scale.setScalar(0.1 + fx.grow * k);
     fx.obj.material.opacity = Math.max(0, 0.9 * (1 - k));
     if (fx.life <= 0) { scene.remove(fx.obj); if (fx.obj.isLine) fx.obj.geometry.dispose(); effects.splice(i, 1); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Debug drawings (bot.draw.* — Robocode's onPaint). Shown for the followed bot,
+// or for every bot with D.
+// ---------------------------------------------------------------------------
+let showAllDrawings = false;
+const drawObjs = [];
+const drawTexts = [];
+function clearDrawings() {
+  for (const o of drawObjs) { scene.remove(o); o.geometry.dispose(); o.material.dispose(); }
+  drawObjs.length = 0;
+  for (const t of drawTexts) t.el.remove();
+  drawTexts.length = 0;
+}
+function renderDrawings(frame) {
+  clearDrawings();
+  const all = frame.drawings || {};
+  for (const [id, shapes] of Object.entries(all)) {
+    if (!showAllDrawings && Number(id) !== followId) continue;
+    for (const sh of shapes) {
+      const mat = new THREE.LineBasicMaterial({ color: sh.c || '#ffffff', transparent: true, opacity: 0.9, depthTest: false });
+      let pts = null;
+      if (sh.k === 'line') {
+        pts = [toScene(sh.x0, sh.y0, groundAt(sh.x0, sh.y0) + 0.2), toScene(sh.x1, sh.y1, groundAt(sh.x1, sh.y1) + 0.2)];
+      } else if (sh.k === 'circle') {
+        pts = [];
+        for (let i = 0; i <= 32; i++) {
+          const a = (i / 32) * Math.PI * 2, x = sh.x + Math.sin(a) * sh.r, y = sh.y + Math.cos(a) * sh.r;
+          pts.push(toScene(x, y, groundAt(sh.x, sh.y) + 0.2));
+        }
+      } else if (sh.k === 'text') {
+        const el = document.createElement('div'); el.className = 'tag';
+        el.innerHTML = `<div class="n" style="color:${sh.c}">${String(sh.t).replace(/</g, '&lt;')}</div>`;
+        $('labels').appendChild(el);
+        drawTexts.push({ el, pos: toScene(sh.x, sh.y, groundAt(sh.x, sh.y) + 0.3) });
+        continue;
+      }
+      if (!pts) continue;
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat);
+      line.renderOrder = 10;
+      scene.add(line); drawObjs.push(line);
+    }
   }
 }
 
@@ -732,11 +784,16 @@ function placeLabels() {
   const half = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   for (const t of tanks.values()) {
     if (!t.data || t.state === 'dead') continue;
-    const p = toScene(t.data.x, t.data.y, t.data.z + 1.1).project(camera);
+    const p = toScene(t.data.x, t.data.y, t.data.z + 0.75 * tankScale()).project(camera);
     const visible = p.z < 1;
     t.tag.style.display = visible ? '' : 'none';
     t.tag.style.left = `${p.x * half.x + half.x}px`;
     t.tag.style.top = `${-p.y * half.y + half.y}px`;
+  }
+  for (const t of drawTexts) {
+    const p = t.pos.clone().project(camera);
+    t.el.style.left = `${p.x * half.x + half.x}px`;
+    t.el.style.top = `${-p.y * half.y + half.y}px`;
   }
 }
 
@@ -772,6 +829,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'n' || e.key === 'N') $('b-step').click();
   else if (e.key === 'r' || e.key === 'R') toggleRadar();
   else if (e.key === 't' || e.key === 'T') toggleTopDown();
+  else if (e.key === 'd' || e.key === 'D') showAllDrawings = !showAllDrawings;
   else if (e.key === 'Escape') followId = null;
 });
 
@@ -848,7 +906,8 @@ function connect() {
       }
       case 'tick':
         $('h-tick').textContent = `tick ${msg.tick}`;
-        updateTanks(msg); updateBullets(msg); handleEvents(msg); renderScoreboard(msg);
+        updateTanks(msg); updateBullets(msg); handleEvents(msg); renderScoreboard(msg); renderDrawings(msg);
+        $('h-inactive').classList.toggle('hidden', !msg.inactive);
         break;
       case 'round_end': {
         const top = msg.ranking[0];

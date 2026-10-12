@@ -234,3 +234,90 @@ def test_survival_points_for_outliving_enemies() -> None:
     assert arena.scorer.scores[0].survival == 50
     assert arena.scorer.scores[2].survival == 50
     assert arena.slots[2].body.state == ALIVE
+
+
+# --- Robocode rules from RoboWiki (Game_Physics, Scoring) -----------------
+
+def test_bullets_that_cross_destroy_each_other() -> None:
+    arena = make_arena(WorldGrid(30, 30), [Gunner(), Gunner()],
+                       [(5.5, 15.5, 90, 90), (25.5, 15.5, 270, 270)])
+    for _ in range(40):
+        frame = arena.step()
+        if any(e["type"] == "bullet_hit_bullet" for e in frame["events"]):
+            break
+    else:
+        raise AssertionError("bullets never collided")
+    assert arena.scorer.scores[0].hits == 0 and arena.scorer.scores[1].hits == 0
+
+
+def test_bullet_collisions_can_be_switched_off() -> None:
+    arena = make_arena(WorldGrid(30, 30), [Gunner(), Gunner()],
+                       [(5.5, 15.5, 90, 90), (25.5, 15.5, 270, 270)], bullet_collisions=False)
+    run_until_hit(arena)
+
+
+def test_inactivity_drains_everyone_after_quiet_period() -> None:
+    arena = make_arena(WorldGrid(30, 30), [Duck(), Duck()],
+                       [(5.5, 5.5, 0, 0), (25.5, 25.5, 0, 0)], inactivity_time=10)
+    for _ in range(10):
+        arena.step()
+    assert arena.slots[0].body.energy == 100
+    for _ in range(5):
+        arena.step()
+    assert arena.slots[0].body.energy == pytest.approx(100 - 5 * 0.1)
+    assert arena.slots[1].body.energy == pytest.approx(100 - 5 * 0.1)
+
+
+def test_bot_moving_away_from_contact_is_not_stopped() -> None:
+    class Reverse(BattleAgent):
+        def decide(self, obs):
+            return BattleAction(velocity=-0.5)   # heading north, so drives south, away
+
+    arena = make_arena(WorldGrid(20, 20), [Reverse(), Duck()],
+                       [(10.5, 10.0, 0, 0), (10.5, 11.5, 0, 0)])   # already touching
+    for _ in range(5):
+        arena.step()
+    assert arena.slots[0].body.y < 10.0
+    assert arena.slots[1].body.energy == 100
+
+
+def test_shooter_learns_bullet_id_and_hit_reports_it() -> None:
+    class Recorder(Gunner):
+        def on_round_start(self, round_number, rounds):
+            self.fired, self.hits = [], []
+
+        def decide(self, obs):
+            self.fired += [f.bullet_id for f in obs.bullet_fired]
+            self.hits += [h.bullet_id for h in obs.bullet_hit]
+            return super().decide(obs)
+
+    rec = Recorder()
+    arena = make_arena(WorldGrid(20, 20), [rec, Duck()], [(5.5, 10.5, 90, 90), (10.5, 10.5, 0, 0)])
+    run_until_hit(arena)
+    arena.step()
+    assert rec.fired and rec.hits and rec.hits[0] == rec.fired[0]
+
+
+def test_bots_get_rules_and_debug_drawings_reach_the_frame() -> None:
+    class Painter(BattleAgent):
+        def decide(self, obs):
+            self.draw.circle(obs.x, obs.y, self.rules.radar_range)
+            return BattleAction()
+
+    runner = BattleRunner(BattleConfig(rounds=1, max_ticks_per_round=3, terrain="flat",
+                                       radar_range=12.0),
+                          [(Painter, 1), (Duck, 1)], time_budget_ms=None)
+    runner.start_round()
+    frame = runner.step()
+    shapes = frame["drawings"][0]
+    assert shapes[0]["k"] == "circle" and shapes[0]["r"] == 12.0
+
+
+def test_kill_bonus_is_share_of_all_damage_to_victim() -> None:
+    world = WorldGrid(20, 20)
+    arena = make_arena(world, [Gunner(), Duck()], [(5.5, 10.5, 90, 90), (10.5, 10.5, 0, 0)])
+    arena.slots[1].body.energy = 10.0
+    run_until_hit(arena)
+    score = arena.scorer.scores[0]
+    assert score.bullet_damage == pytest.approx(10.0)
+    assert score.bullet_kill_bonus == pytest.approx(0.2 * 10.0)

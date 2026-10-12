@@ -20,6 +20,10 @@ Design notes:
 - `memory` is one dict per bot class that survives between rounds, the equivalent
   of Robocode static fields. Use it for statistics a learning bot carries over
   (GuessFactor histograms, hit rates). Every bot is re-created each round.
+- `rules` is the battle's BattleConfig (Robocode's Rules class plus the battle
+  settings): bullet_speed(power), damage(power), gun_cooling_rate, max_velocity...
+  It's a copy; changing it changes nothing.
+- `draw` is a DebugCanvas for graphical debugging (Robocode's onPaint).
 """
 
 from __future__ import annotations
@@ -27,6 +31,8 @@ from __future__ import annotations
 import abc
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from terrabots.battle.config import BattleConfig
+from terrabots.battle.debug import DebugCanvas
 from terrabots.world_terrain import CreatureMoveProfile
 
 if TYPE_CHECKING:
@@ -43,6 +49,8 @@ class BattleAgent(abc.ABC):
         self.bot_id: int = -1               # set by the arena before on_round_start()
         self.name: str = type(self).__name__
         self.memory: dict[str, Any] = {}    # replaced by the per-class battle memory
+        self.rules: BattleConfig = BattleConfig()   # replaced by the battle's rules
+        self.draw = DebugCanvas()
 
     def on_round_start(self, round_number: int, rounds: int) -> None:
         """Called once per round after bot_id, name and memory are set."""

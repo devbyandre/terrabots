@@ -27,7 +27,19 @@ class ScannedBot:
 
 
 @dataclass(frozen=True)
+class BulletFired:
+    """Your shot from last tick left the gun (Robocode's setFireBullet() return value)."""
+    bullet_id: int
+    x: float
+    y: float
+    heading: float
+    power: float
+    speed: float         # cells/tick
+
+
+@dataclass(frozen=True)
 class HitByBullet:
+    bullet_id: int
     shooter_id: int
     bearing: float       # direction the bullet came from
     power: float
@@ -36,6 +48,7 @@ class HitByBullet:
 
 @dataclass(frozen=True)
 class BulletHit:
+    bullet_id: int
     target_id: int
     power: float
     damage: float
@@ -44,8 +57,17 @@ class BulletHit:
 
 @dataclass(frozen=True)
 class BulletMissed:
+    bullet_id: int
     power: float
     reason: str          # "terrain" or "arena"
+
+
+@dataclass(frozen=True)
+class BulletHitBullet:
+    """Your bullet collided with another bullet; both are gone."""
+    bullet_id: int
+    other_bullet_id: int
+    other_shooter_id: int
 
 
 @dataclass(frozen=True)

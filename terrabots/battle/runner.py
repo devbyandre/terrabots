@@ -23,6 +23,7 @@ decide_time_budget_ms to None.
 from __future__ import annotations
 
 import csv
+import dataclasses
 import io
 import json
 import random
@@ -162,6 +163,7 @@ class BattleRunner:
         for bid, (cls, name) in enumerate(self.names):
             agent = cls()
             agent.bot_id, agent.name, agent.memory = bid, name, self.memory[cls]
+            agent.rules = dataclasses.replace(self.config)
             agents.append(agent)
         self.arena = Arena(self.config, self.world, agents, self.round, self.rng,
                            time_budget_ms=self.time_budget_ms)

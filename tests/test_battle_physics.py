@@ -7,9 +7,12 @@ from terrabots.battle.physics import (
     BattleBody,
     apply_turns,
     blocked_reason,
+    boxes_overlap,
+    footprint_passable,
     in_radar_arc,
     next_velocity,
-    segment_circle_t,
+    segment_box_t,
+    segments_intersect_t,
     terrain_block_t,
 )
 from terrabots.world_terrain import Cell, CreatureMoveProfile, MovementResolver, TerrainType, WorldGrid
@@ -30,6 +33,13 @@ def test_brakes_at_deceleration_rate() -> None:
 
 def test_reversing_brakes_first() -> None:
     assert next_velocity(0.3, -0.5, CFG) == pytest.approx(0.3 - CFG.deceleration)
+
+
+def test_reversing_through_zero_uses_leftover_tick_to_accelerate() -> None:
+    # 1 px/tick, braking 2 px/tick²: stops after half a tick, then accelerates
+    # the other way for the remaining half at 1 px/tick² -> -0.5 px/tick.
+    v = next_velocity(1 / 16, -0.5, CFG)
+    assert v == pytest.approx(-0.5 / 16)
 
 
 def test_velocity_clamped_to_max() -> None:
@@ -63,28 +73,48 @@ def test_adjust_flags_make_headings_independent() -> None:
 
 # --- passability ----------------------------------------------------------
 
+HALF = CFG.body_half_width   # 1.125 cells: Robocode's 36 px square
+
+
 def _ridge_world() -> WorldGrid:
-    world = WorldGrid(10, 10)
-    world.set(5, 5, Cell(TerrainType.PLAIN, elevation=5.0))   # too steep from 0
-    world.set(6, 5, Cell(TerrainType.ROCK, elevation=1.0))
+    world = WorldGrid(20, 20)
+    for y in range(20):
+        world.set(10, y, Cell(TerrainType.PLAIN, elevation=5.0))   # too steep from 0
+    world.set(14, 5, Cell(TerrainType.ROCK, elevation=1.0))
     return world
 
 
-def test_arena_edge_blocks() -> None:
-    world = _ridge_world()
-    assert blocked_reason(0.3, 5.5, (0, 5), world, MovementResolver(world), PROFILE, 0.45) == "arena"
-
-
-def test_climb_limit_applies_across_cell_boundary() -> None:
+def test_arena_edge_blocks_the_whole_square() -> None:
     world = _ridge_world()
     mv = MovementResolver(world)
-    assert blocked_reason(5.05, 5.5, (4, 5), world, mv, PROFILE, 0.45) == "terrain"
-    assert blocked_reason(4.95, 5.5, (4, 5), world, mv, PROFILE, 0.45) is None
+    assert blocked_reason(1.2, 5.5, 1.1, 5.5, world, mv, PROFILE, HALF) == "arena"
+    assert blocked_reason(1.3, 5.5, 1.2, 5.5, world, mv, PROFILE, HALF) is None
+
+
+def test_climb_limit_applies_when_a_corner_crosses_into_a_steep_cell() -> None:
+    world = _ridge_world()
+    mv = MovementResolver(world)
+    # Centre at 8.8: right edge at 9.925, still in cell 9. Moving to 8.9 puts it in 10.
+    assert blocked_reason(8.8, 5.5, 8.9, 5.5, world, mv, PROFILE, HALF) == "terrain"
+    assert blocked_reason(8.7, 5.5, 8.8, 5.5, world, mv, PROFILE, HALF) is None
 
 
 def test_rock_blocks_movement() -> None:
     world = _ridge_world()
-    assert blocked_reason(6.1, 6.5 - 1, (7, 5), world, MovementResolver(world), PROFILE, 0.45) == "terrain"
+    mv = MovementResolver(world)
+    assert blocked_reason(12.8, 5.5, 12.9, 5.5, world, mv, PROFILE, HALF) == "terrain"
+
+
+def test_spawn_needs_every_corner_passable() -> None:
+    world = _ridge_world()
+    mv = MovementResolver(world)
+    assert not footprint_passable(14.5, 6.0, world, mv, PROFILE, HALF)   # covers the rock
+    assert footprint_passable(17.0, 15.0, world, mv, PROFILE, HALF)
+
+
+def test_boxes_overlap_is_axis_aligned() -> None:
+    assert boxes_overlap(0, 0, 2.2, 2.2, HALF)       # corners overlap
+    assert not boxes_overlap(0, 0, 2.3, 0, HALF)
 
 
 # --- radar arc ------------------------------------------------------------
@@ -121,11 +151,25 @@ def test_out_of_radar_range() -> None:
 
 def test_fast_bullet_cannot_skip_through_body() -> None:
     # Body sits between start and end of one tick's flight.
-    assert segment_circle_t(0, 0, 10, 0, 5, 0, 0.45) == pytest.approx(4.55 / 10)
+    assert segment_box_t(0, 0, 10, 0, 5, 0, HALF) == pytest.approx((5 - HALF) / 10)
 
 
 def test_bullet_passing_beside_body_misses() -> None:
-    assert segment_circle_t(0, 0, 10, 0, 5, 1.0, 0.45) is None
+    assert segment_box_t(0, 0, 10, 0, 5, 1.2, HALF) is None
+
+
+def test_bullet_hits_box_corner_a_circle_would_miss() -> None:
+    # Diagonal pass near the corner: inside the square, outside its inscribed circle.
+    assert segment_box_t(3.0, 1.0, 5.0, -1.0, 5, 0, HALF) is not None
+    assert segment_box_t(3.0, 1.0, 5.0, -1.0, 5, 0, 0.45) is None
+
+
+def test_crossing_bullets_intersect() -> None:
+    assert segments_intersect_t((0, 0), (2, 2), (0, 2), (2, 0)) == pytest.approx(0.5)
+    assert segments_intersect_t((0, 0), (1, 0), (0, 1), (1, 1)) is None
+    # head-on along one line
+    assert segments_intersect_t((0, 0), (1, 0), (1.5, 0), (0.5, 0)) == pytest.approx(0.5)
+    assert segments_intersect_t((0, 0), (1, 0), (3, 0), (2, 0)) is None
 
 
 def test_hill_above_flight_height_stops_bullet() -> None:

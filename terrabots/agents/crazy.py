@@ -35,7 +35,7 @@ class Crazy(BattleAgent):
         target = min(obs.scanned_bots, key=lambda s: s.distance)
         tx, ty = project(obs.x, obs.y, target.bearing, target.distance)
         power = 2.0
-        bullet_speed = (20 - 3 * power) / 16  # default arena rule; see BattleConfig.bullet_speed
+        bullet_speed = self.rules.bullet_speed(power)
         # Iterate: where is the target when a bullet fired now could reach it?
         px, py = tx, ty
         for _ in range(10):
@@ -44,6 +44,9 @@ class Crazy(BattleAgent):
             px = min(max(px, 0.5), obs.arena_width - 0.5)
             py = min(max(py, 0.5), obs.arena_height - 0.5)
         aim = heading_to(obs.x, obs.y, px, py)
+        # Graphical debugging: press D in the viewer (or follow this bot) to see it.
+        self.draw.line(obs.x, obs.y, px, py, color="#7dc4ff")
+        self.draw.circle(px, py, 0.8, color="#7dc4ff")
 
         radar_err = normalize_angle(target.bearing - obs.radar_heading)
         self.radar_dir = 1.0 if radar_err >= 0 else -1.0

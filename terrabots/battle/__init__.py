@@ -5,7 +5,9 @@ from terrabots.battle.agent import BattleAgent
 from terrabots.battle.config import BattleConfig, BattleFile, BotEntry
 from terrabots.battle.events import (
     BotDeath,
+    BulletFired,
     BulletHit,
+    BulletHitBullet,
     BulletMissed,
     HitBot,
     HitByBullet,
@@ -18,5 +20,5 @@ from terrabots.battle.runner import BattleResults, BattleRunner
 __all__ = [
     "BattleAction", "BattleAgent", "BattleConfig", "BattleFile", "BotEntry",
     "BattleObservation", "BattleResults", "BattleRunner",
-    "BotDeath", "BulletHit", "BulletMissed", "HitBot", "HitByBullet", "HitWall", "ScannedBot",
+    "BotDeath", "BulletFired", "BulletHit", "BulletHitBullet", "BulletMissed", "HitBot", "HitByBullet", "HitWall", "ScannedBot",
 ]

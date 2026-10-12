@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING
 
 from terrabots.battle.events import (
     BotDeath,
+    BulletFired,
     BulletHit,
+    BulletHitBullet,
     BulletMissed,
     HitBot,
     HitByBullet,
@@ -91,9 +93,12 @@ class BattleObservation:
     hit_by_bullet: list[HitByBullet] = field(default_factory=list)
     bullet_hit: list[BulletHit] = field(default_factory=list)
     bullet_missed: list[BulletMissed] = field(default_factory=list)
+    bullet_fired: list[BulletFired] = field(default_factory=list)
+    bullet_hit_bullet: list[BulletHitBullet] = field(default_factory=list)
     hit_wall: list[HitWall] = field(default_factory=list)
     hit_bot: list[HitBot] = field(default_factory=list)
     bot_death: list[BotDeath] = field(default_factory=list)
+    skipped_turns: int = 0           # your turns skipped so far this round (too slow / errors)
     inbox: list[Message] = field(default_factory=list)
 
     @property

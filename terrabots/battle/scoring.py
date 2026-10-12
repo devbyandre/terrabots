@@ -1,14 +1,17 @@
 """
-Robocode-like scoring (docs/arena-spec.md §7), per round and summed per battle.
+Robocode scoring (RoboWiki: Robocode/Scoring), per round and summed per battle.
 
-| Component         | Points                                         |
-|-------------------|------------------------------------------------|
-| Survival          | 50 per enemy that dies while you are alive     |
-| Last survivor     | 10 × enemies at round start                    |
-| Bullet damage     | 1 per point of damage dealt                    |
-| Bullet kill bonus | 20 % of bullet damage dealt to a bot you killed|
-| Ram damage        | 2 per point                                    |
-| Ram kill bonus    | 30 % of ram damage dealt to a bot you killed   |
+| Component         | Points                                                   |
+|-------------------|----------------------------------------------------------|
+| Survival          | 50 every time another bot dies while you are alive       |
+| Last survivor     | 10 for each bot that died before you                     |
+| Bullet damage     | 1 per point of damage dealt                              |
+| Bullet kill bonus | 20 % of all the damage you did to a bot you killed       |
+| Ram damage        | 2 per point of damage dealt by ramming                   |
+| Ram kill bonus    | 30 % of all the damage you did to a bot you rammed dead  |
+
+"All the damage" is read literally (bullet + ram damage to that bot). 1sts, 2nds
+and 3rds don't add points; they show how often a bot placed.
 """
 
 from __future__ import annotations
@@ -72,9 +75,8 @@ class BotScore:
 class RoundScorer:
     """Accumulates scoring events during one round."""
     scores: dict[int, BotScore]
-    # bullet / ram damage dealt, by (attacker, victim), for kill bonuses
-    _bullet_dealt: dict[tuple[int, int], float] = field(default_factory=lambda: defaultdict(float))
-    _ram_dealt: dict[tuple[int, int], float] = field(default_factory=lambda: defaultdict(float))
+    # all damage dealt, by (attacker, victim), for kill bonuses
+    _dealt: dict[tuple[int, int], float] = field(default_factory=lambda: defaultdict(float))
     death_order: list[int] = field(default_factory=list)
 
     def shot(self, shooter: int) -> None:
@@ -84,11 +86,11 @@ class RoundScorer:
         s = self.scores[shooter]
         s.hits += 1
         s.bullet_damage += dealt
-        self._bullet_dealt[(shooter, victim)] += dealt
+        self._dealt[(shooter, victim)] += dealt
 
     def ram(self, rammer: int, victim: int, dealt: float) -> None:
         self.scores[rammer].ram_damage += dealt
-        self._ram_dealt[(rammer, victim)] += dealt
+        self._dealt[(rammer, victim)] += dealt
 
     def death(self, victim: int, killer: int | None, killed_by_ram: bool,
               survivors: list[int]) -> None:
@@ -96,10 +98,11 @@ class RoundScorer:
         for bot_id in survivors:
             self.scores[bot_id].survival += SURVIVAL_PER_DEATH
         if killer is not None and killer != victim:
+            dealt = self._dealt[(killer, victim)]
             if killed_by_ram:
-                self.scores[killer].ram_kill_bonus += RAM_KILL_BONUS * self._ram_dealt[(killer, victim)] * RAM_DAMAGE_POINTS
+                self.scores[killer].ram_kill_bonus += RAM_KILL_BONUS * dealt
             else:
-                self.scores[killer].bullet_kill_bonus += BULLET_KILL_BONUS * self._bullet_dealt[(killer, victim)]
+                self.scores[killer].bullet_kill_bonus += BULLET_KILL_BONUS * dealt
 
     def finish(self, survivors_by_energy: list[tuple[int, float]], n_bots: int) -> list[int]:
         """Award last-survivor bonus and placements. Returns bot ids, 1st place first."""

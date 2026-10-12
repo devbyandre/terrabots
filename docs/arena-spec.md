@@ -65,7 +65,7 @@ in the setup screen, sent over the WebSocket as JSON. All values validated on lo
 | | `acceleration` / `deceleration` | 0.05 / 0.1 | Robocode: 1 / 2 px/tick² |
 | | `max_body_turn_deg` | 10 − 0.75·\|v\| scaled | Robocode formula, velocity in px |
 | | `max_gun_turn_deg` | 20 | per tick |
-| | `body_radius` | 0.45 cells | collision radius for bullets and ramming |
+| | `body_half_width` | 1.125 cells | square hitbox (Robocode 36 px), axis-aligned, for bullets, rams and terrain |
 | Gun | `min_bullet_power` / `max_bullet_power` | 0.1 / 3.0 | |
 | | `bullet_speed` | formula `20 − 3·power` px/tick, scaled | or a fixed override `bullet_speed_fixed` |
 | | `max_bullet_speed` | cap, optional | the "max speed of bullets" setting |

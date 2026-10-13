@@ -1,0 +1,44 @@
+name: Bot submission
+description: Enter your bot into the Terrabots tournament and leaderboard
+title: "Bot submission: "
+labels: ["bot submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for entering! A pull request adding `contrib/<your-github-name>/<bot>.py` is the quickest way;
+        if you'd rather not, link your code below and a maintainer will add it. Rules: see CONTRIBUTING.md#submit-a-bot.
+  - type: input
+    id: name
+    attributes:
+      label: Bot name and class
+      placeholder: "MyTank (contrib.yourname.my_tank:MyTank)"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: ["Battle", "Survival", "Both"]
+    validations:
+      required: true
+  - type: input
+    id: code
+    attributes:
+      label: Link to the code (PR, gist or repo)
+    validations:
+      required: true
+  - type: textarea
+    id: strategy
+    attributes:
+      label: Strategy in a few sentences
+      description: Movement, radar, gun, anything clever. This helps learners.
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Rules
+      options:
+        - label: The bot is my own work and MIT licensed
+          required: true
+        - label: It doesn't use files (besides self.storage), the network, processes or threads
+          required: true

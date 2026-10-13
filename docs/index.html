@@ -139,6 +139,38 @@
   .center .lede { margin: 0 auto; }
   .final .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
 
+  /* maps */
+  .maplist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .maplist span { font: 13px var(--mono); color: var(--text); background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+  .framed { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); }
+  .framed img { display: block; width: 100%; height: auto; }
+
+  /* leaderboard */
+  .boards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+  @media (max-width: 980px) { .boards { grid-template-columns: 1fr; } }
+  .board { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 20px 14px; min-width: 0; }
+  .board h3 { font-size: 18px; margin-bottom: 4px; }
+  .board .sub { color: var(--dim); font-size: 13px; margin-bottom: 12px; }
+  .board table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .board td, .board th { padding: 7px 4px; border-top: 1px solid var(--line); text-align: left; }
+  .board th { color: var(--dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border-top: 0; }
+  .board td.r, .board th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .board td.rk { color: var(--dim); width: 26px; }
+  .board tr.top td { color: var(--text); }
+  .board tr.top td.nm { color: var(--accent); font-weight: 600; }
+  .board td.nm { color: var(--text); }
+  .board .tag { font-size: 11px; color: var(--dim); margin-left: 6px; }
+  .lbnote { color: var(--dim); font-size: 13px; margin-top: 16px; }
+
+  /* submit */
+  .submit { margin-top: 48px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: center; background: linear-gradient(135deg, rgba(242,179,61,0.12), rgba(143,179,90,0.08)); border: 1px solid var(--line-2); border-radius: 18px; padding: 36px; }
+  @media (max-width: 900px) { .submit { grid-template-columns: 1fr; padding: 24px; } }
+  .submit h3 { font: 700 26px var(--display); margin-bottom: 10px; }
+  .submit p { color: var(--muted); }
+  .submit ol { color: var(--muted); padding-left: 20px; display: grid; gap: 8px; font-size: 15px; }
+  .submit ol b { color: var(--text); font-weight: 600; }
+  .submit .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+
   footer { border-top: 1px solid var(--line); padding: 36px 0; color: var(--dim); font-size: 14px; }
   footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
   footer a { color: var(--muted); }
@@ -154,8 +186,9 @@
     </a>
     <div class="links">
       <a href="#features">Features</a>
+      <a href="#maps">Maps</a>
       <a href="#bot">Write a bot</a>
-      <a href="#audience">Who it's for</a>
+      <a href="#leaderboard">Leaderboard</a>
       <a href="https://github.com/devbyandre/terrabots/blob/main/docs/battle-guide.md">Guides</a>
       <a class="gh" href="https://github.com/devbyandre/terrabots">GitHub</a>
     </div>
@@ -177,12 +210,12 @@
     <div class="install"><span>$</span><code>pip install -e ".[dev]" &amp;&amp; terrabots-battle</code></div>
     <div class="shot">
       <div class="bar"><i></i><i></i><i></i><span>localhost:8765 · battle viewer</span></div>
-      <img src="assets/battle.png" alt="Six tanks on procedural terrain with translucent radar sweeps, scan lines and a live scoreboard" width="1440" height="810">
+      <img src="assets/battle.png" alt="Seven tanks on the Twin Hills map with smooth terrain, translucent radar sweeps, scan lines and a live scoreboard" width="1440" height="810">
     </div>
     <div class="stats">
       <div><b>1 file</b><span>is a complete bot</span></div>
-      <div><b>35</b><span>tunable battle rules</span></div>
-      <div><b>~8k</b><span>ticks per second headless</span></div>
+      <div><b>37</b><span>tunable battle rules</span></div>
+      <div><b>7 maps</b><span>plus random terrain and your own</span></div>
       <div><b>100%</b><span>reproducible with a seed</span></div>
     </div>
   </div>
@@ -223,6 +256,21 @@
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M7 10.5V16c0 1.5 2.5 3 5 3s5-1.5 5-3v-5.5"/></svg></div>
         <h3>Port your Robocode bot</h3>
         <p>An <code>AdvancedRobot</code> API with Robocode's queued commands and events, rules checked against RoboWiki, and <code>onPaint</code>-style debug drawing.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg></div>
+        <h3>Maps &amp; map builder</h3>
+        <p>Seven hand-made arenas, seeded random terrain, or your own: sculpt hills, rock and water in the browser, check that every spot is reachable, save and battle.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 10l3 2-3 2M13 15h3"/></svg></div>
+        <h3>See what your bot sees</h3>
+        <p>Fog of war shows one bot's view of the world. A live console shows your bot's <code>print</code> and <code>log()</code> output; debug drawings show its plans.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4-3-7-6.5-7-10a7 7 0 0 1 14 0c0 3.5-3 7-7 10z"/><circle cx="12" cy="11" r="2.5"/></svg></div>
+        <h3>Survival mode</h3>
+        <p>No guns, just hunger: creatures forage, pay for every climb, and talk to each other. A guide walks from reflexes through foraging theory to learning and evolution.</p>
       </div>
     </div>
   </div>
@@ -270,6 +318,24 @@
   </div>
 </section>
 
+<section id="maps">
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow">Maps</div>
+      <h2>Pick a battlefield, or build your own</h2>
+      <p class="lede">Each built-in map asks a different question: who takes the hill, who controls the choke point, who hides behind the wall.</p>
+      <div class="maplist"><span>arena</span><span>twin-hills</span><span>ridge</span><span>lakes</span><span>fortress</span><span>canyon</span><span>badlands</span><span>random</span></div>
+      <ul class="checks">
+        <li><b>Map builder in the browser.</b> Raise, lower, smooth and flatten; paint rock, water and stairs; undo; start from any map.</li>
+        <li><b>Fairness check.</b> Warns when parts of the map are cut off by rock, water or climbs too steep for a tank.</li>
+        <li><b>Plain JSON files.</b> Saved to <code>maps/</code>, shareable, usable from TOML, the CLI and Python.</li>
+        <li><b>Smooth terrain.</b> Rendered as continuous slopes; the rules still work on a grid you can switch back on.</li>
+      </ul>
+    </div>
+    <div class="framed"><img src="assets/mapbuilder.png" alt="Map builder editing the Canyon map, with brush tools and a passed fairness check" width="1440" height="810" loading="lazy"></div>
+  </div>
+</section>
+
 <section id="bot">
   <div class="wrap split">
     <div class="codebox">
@@ -310,10 +376,73 @@
     <div class="eyebrow">Screens</div>
     <h2>Set up, watch, analyse</h2>
     <div class="gallery">
-      <figure><img src="assets/closeup.png" alt="Close-up of a tank with its radar locked on an enemy" width="1440" height="810"><figcaption><b>Follow a bot.</b> Radar lock, scan lines and tracers up close.</figcaption></figure>
-      <figure><img src="assets/topdown.png" alt="Top-down view of the arena with lakes and hills" width="1440" height="810"><figcaption><b>Top-down view.</b> The classic Robocode perspective, with terrain.</figcaption></figure>
-      <figure><img src="assets/setup.png" alt="Battle setup screen with bot counters and grouped settings" width="1440" height="810"><figcaption><b>Setup screen.</b> Pick bots, tune every rule, load and save TOML.</figcaption></figure>
-      <figure><img src="assets/results.png" alt="Results table with scores, placements and hit rates" width="1440" height="810"><figcaption><b>Results.</b> Robocode-style scoring, saved as JSON and CSV.</figcaption></figure>
+      <figure><img src="assets/closeup.png" alt="Close-up of a tank inside the Fortress map, radar locked on an enemy" width="1440" height="810" loading="lazy"><figcaption><b>Follow a bot.</b> Radar lock, scan lines and tracers up close, here inside the Fortress.</figcaption></figure>
+      <figure><img src="assets/fog.png" alt="Fog of war: the arena darkened except what one tank sees" width="1440" height="810" loading="lazy"><figcaption><b>Fog of war.</b> Only what the followed bot can see; hills cast blind spots.</figcaption></figure>
+      <figure><img src="assets/console.png" alt="Battle with the console panel open, showing a bot's log lines per tick" width="1440" height="810" loading="lazy"><figcaption><b>Console.</b> Your bot's prints and logs, live, with round and tick.</figcaption></figure>
+      <figure><img src="assets/survival.png" alt="Survival mode on the Lakes map with creatures and food" width="1440" height="810" loading="lazy"><figcaption><b>Survival.</b> Foragers on the Lakes map, food glowing where it grows.</figcaption></figure>
+      <figure><img src="assets/setup.png" alt="Battle setup screen with bot counters, map choice and grouped settings" width="1440" height="810" loading="lazy"><figcaption><b>Setup screen.</b> Pick bots and a map, tune every rule, load and save TOML.</figcaption></figure>
+      <figure><img src="assets/results.png" alt="Results table with scores, placements and hit rates" width="1440" height="810" loading="lazy"><figcaption><b>Results.</b> Robocode-style scoring, saved as JSON and CSV.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="leaderboard">
+  <div class="wrap">
+    <div class="eyebrow">Leaderboard</div>
+    <h2>Who rules the hills?</h2>
+    <p class="lede">Every bot in the repo fights every other one on seeded maps, 1v1 and all together, and the survival agents share the same worlds. Re-run weekly and whenever a bot is added.</p>
+    <div class="boards">
+      <div class="board">
+        <h3>1v1</h3><div class="sub">Average percentage score vs. each opponent</div>
+        <table><thead><tr><th>#</th><th>Bot</th><th class="r">APS</th></tr></thead>
+          <tbody id="lb-1v1">
+            <tr class="top"><td class="rk">1</td><td class="nm">Learner</td><td class="r">76.3</td></tr>
+            <tr><td class="rk">2</td><td class="nm">Crazy</td><td class="r">74.3</td></tr>
+            <tr><td class="rk">3</td><td class="nm">SpinBot</td><td class="r">64.3</td></tr>
+            <tr><td class="rk">4</td><td class="nm">FirstTank<span class="tag">template</span></td><td class="r">59.7</td></tr>
+            <tr><td class="rk">5</td><td class="nm">Corners</td><td class="r">47.4</td></tr>
+            <tr><td class="rk">6</td><td class="nm">Tracker</td><td class="r">47.4</td></tr>
+          </tbody></table>
+      </div>
+      <div class="board">
+        <h3>Melee</h3><div class="sub">Share of points, 100 % = an equal share</div>
+        <table><thead><tr><th>#</th><th>Bot</th><th class="r">Share</th></tr></thead>
+          <tbody id="lb-melee">
+            <tr class="top"><td class="rk">1</td><td class="nm">Crazy</td><td class="r">168 %</td></tr>
+            <tr><td class="rk">2</td><td class="nm">FirstTank<span class="tag">template</span></td><td class="r">150 %</td></tr>
+            <tr><td class="rk">3</td><td class="nm">Learner</td><td class="r">133 %</td></tr>
+            <tr><td class="rk">4</td><td class="nm">SpinBot</td><td class="r">114 %</td></tr>
+            <tr><td class="rk">5</td><td class="nm">Corners</td><td class="r">101 %</td></tr>
+            <tr><td class="rk">6</td><td class="nm">Tracker</td><td class="r">83 %</td></tr>
+          </tbody></table>
+      </div>
+      <div class="board">
+        <h3>Survival</h3><div class="sub">Average lifetime in ticks, mixed worlds</div>
+        <table><thead><tr><th>#</th><th>Agent</th><th class="r">Lifetime</th></tr></thead>
+          <tbody id="lb-survival">
+            <tr class="top"><td class="rk">1</td><td class="nm">LevyForager</td><td class="r">220</td></tr>
+            <tr><td class="rk">2</td><td class="nm">Grazer</td><td class="r">205</td></tr>
+            <tr><td class="rk">3</td><td class="nm">Sharer</td><td class="r">171</td></tr>
+            <tr><td class="rk">4</td><td class="nm">WandererAgent<span class="tag">template</span></td><td class="r">148</td></tr>
+          </tbody></table>
+      </div>
+    </div>
+    <p class="lbnote" id="lb-note">Generated 2026-10-13 by <code>tools/tournament.py</code>. <a href="https://github.com/devbyandre/terrabots/blob/main/docs/leaderboard.md">Full tables and method</a>.</p>
+
+    <div class="submit" id="submit">
+      <div>
+        <h3>Think you can beat them? Submit your bot.</h3>
+        <p>The ladder is wide open: right now it's only the demo bots. Your bot takes part in the next run and stays on the board. Battle tanks and survival foragers are both welcome.</p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/devbyandre/terrabots/blob/main/CONTRIBUTING.md#submit-a-bot">How to submit</a>
+          <a class="btn" href="https://github.com/devbyandre/terrabots/issues/new?template=bot-submission.yml">Open a submission</a>
+        </div>
+      </div>
+      <ol>
+        <li><b>Write a bot</b> in one Python file, starting from <code>bots/first_tank.py</code>.</li>
+        <li><b>Put it in</b> <code>contrib/&lt;your-github-name&gt;/</code> and test it with <code>tools/tournament.py --quick</code>.</li>
+        <li><b>Open a pull request.</b> After review it joins the tournament.</li>
+      </ol>
     </div>
   </div>
 </section>
@@ -360,5 +489,21 @@ terrabots-battle battles/example.toml --headless</pre>
   </div>
 </footer>
 
+<script>
+// The tables above are a snapshot; refresh them from the tournament's output.
+fetch("leaderboard.json").then(r => r.ok ? r.json() : null).then(d => {
+  if (!d) return;
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const fill = (id, list, val) => {
+    document.getElementById(id).innerHTML = list.slice(0, 6).map(e =>
+      `<tr${e.rank === 1 ? ' class="top"' : ""}><td class="rk">${e.rank}</td><td class="nm">${esc(e.name)}` +
+      `${e.origin !== "demo" ? `<span class="tag">${esc(e.origin)}</span>` : ""}</td><td class="r">${val(e)}</td></tr>`).join("");
+  };
+  fill("lb-1v1", d.one_v_one, e => e.aps.toFixed(1));
+  fill("lb-melee", d.melee, e => `${Math.round(e.share)} %`);
+  fill("lb-survival", d.survival, e => Math.round(e.avg_lifetime));
+  document.getElementById("lb-note").firstChild.textContent = `Generated ${d.generated} by `;
+}).catch(() => {});
+</script>
 </body>
 </html>

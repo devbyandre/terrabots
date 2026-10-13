@@ -1,0 +1,33 @@
+name: Tournament
+
+# Rebuilds the leaderboard: weekly, on demand, and when bots change on main.
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["contrib/**", "terrabots/agents/**", "bots/**"]
+
+permissions:
+  contents: write
+
+jobs:
+  tournament:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - run: python tools/tournament.py --workers 4
+      - name: Commit the leaderboard if it changed
+        run: |
+          if git diff --quiet docs/leaderboard.json docs/leaderboard.md; then exit 0; fi
+          git config user.name "terrabots-tournament"
+          git config user.email "tournament@users.noreply.github.com"
+          git add docs/leaderboard.json docs/leaderboard.md
+          git commit -m "Update leaderboard"
+          git push

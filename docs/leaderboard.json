@@ -1,0 +1,233 @@
+{
+ "generated": "2026-10-13",
+ "seconds": 40,
+ "settings": {
+  "duel_maps": [
+   "flat",
+   "twin-hills",
+   "ridge",
+   "fortress"
+  ],
+  "melee_maps": [
+   "flat",
+   "lakes",
+   "fortress",
+   "canyon",
+   "procedural"
+  ],
+  "seeds": 2,
+  "duel_rounds": 10,
+  "melee_rounds": 10,
+  "survival_worlds": 16,
+  "survival_ticks": 600,
+  "quick": false
+ },
+ "one_v_one": [
+  {
+   "name": "Learner",
+   "spec": "terrabots.agents.learner:Learner",
+   "origin": "demo",
+   "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
+   "aps": 76.3,
+   "round_win_pct": 75.8,
+   "rank": 1
+  },
+  {
+   "name": "Crazy",
+   "spec": "terrabots.agents.crazy:Crazy",
+   "origin": "demo",
+   "doc": "Random zig-zags; linear-prediction gun.",
+   "aps": 74.3,
+   "round_win_pct": 73.1,
+   "rank": 2
+  },
+  {
+   "name": "SpinBot",
+   "spec": "terrabots.agents.spin_bot:SpinBot",
+   "origin": "demo",
+   "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
+   "aps": 64.3,
+   "round_win_pct": 60.5,
+   "rank": 3
+  },
+  {
+   "name": "FirstTank",
+   "spec": "bots.first_tank:FirstTank",
+   "origin": "template",
+   "doc": "Sweeps its gun until the radar sees someone, then aims and fires.",
+   "aps": 59.7,
+   "round_win_pct": 64.4,
+   "rank": 4
+  },
+  {
+   "name": "Corners",
+   "spec": "terrabots.agents.corners:Corners",
+   "origin": "demo",
+   "doc": "Camps in its best corner (learned across battles) and sweeps its gun.",
+   "aps": 47.4,
+   "round_win_pct": 44.4,
+   "rank": 5
+  },
+  {
+   "name": "Tracker",
+   "spec": "terrabots.agents.tracker:Tracker",
+   "origin": "demo",
+   "doc": "Radar lock, head-on aim, keeps ~10 cells distance.",
+   "aps": 47.4,
+   "round_win_pct": 50.6,
+   "rank": 6
+  },
+  {
+   "name": "RamFire",
+   "spec": "terrabots.agents.ram_fire:RamFire",
+   "origin": "demo",
+   "doc": "Charges the nearest enemy and rams it; weak shots point-blank.",
+   "aps": 39.7,
+   "round_win_pct": 27.7,
+   "rank": 7
+  },
+  {
+   "name": "Walls",
+   "spec": "terrabots.agents.walls:Walls",
+   "origin": "demo",
+   "doc": "Drives along the arena edges, gun pointing inwards; shoots what it sees.",
+   "aps": 31.8,
+   "round_win_pct": 24.5,
+   "rank": 8
+  },
+  {
+   "name": "SittingDuck",
+   "spec": "terrabots.agents.sitting_duck:SittingDuck",
+   "origin": "demo",
+   "doc": "Stands still and does nothing.",
+   "aps": 9.1,
+   "round_win_pct": 29.1,
+   "rank": 9
+  }
+ ],
+ "melee": [
+  {
+   "name": "Crazy",
+   "spec": "terrabots.agents.crazy:Crazy",
+   "origin": "demo",
+   "doc": "Random zig-zags; linear-prediction gun.",
+   "share": 168.4,
+   "round_win_pct": 23.0,
+   "rank": 1
+  },
+  {
+   "name": "FirstTank",
+   "spec": "bots.first_tank:FirstTank",
+   "origin": "template",
+   "doc": "Sweeps its gun until the radar sees someone, then aims and fires.",
+   "share": 150.5,
+   "round_win_pct": 37.0,
+   "rank": 2
+  },
+  {
+   "name": "Learner",
+   "spec": "terrabots.agents.learner:Learner",
+   "origin": "demo",
+   "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
+   "share": 133.1,
+   "round_win_pct": 22.0,
+   "rank": 3
+  },
+  {
+   "name": "SpinBot",
+   "spec": "terrabots.agents.spin_bot:SpinBot",
+   "origin": "demo",
+   "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
+   "share": 113.7,
+   "round_win_pct": 8.0,
+   "rank": 4
+  },
+  {
+   "name": "Corners",
+   "spec": "terrabots.agents.corners:Corners",
+   "origin": "demo",
+   "doc": "Camps in its best corner (learned across battles) and sweeps its gun.",
+   "share": 101.3,
+   "round_win_pct": 6.0,
+   "rank": 5
+  },
+  {
+   "name": "Tracker",
+   "spec": "terrabots.agents.tracker:Tracker",
+   "origin": "demo",
+   "doc": "Radar lock, head-on aim, keeps ~10 cells distance.",
+   "share": 83.0,
+   "round_win_pct": 1.0,
+   "rank": 6
+  },
+  {
+   "name": "Walls",
+   "spec": "terrabots.agents.walls:Walls",
+   "origin": "demo",
+   "doc": "Drives along the arena edges, gun pointing inwards; shoots what it sees.",
+   "share": 68.6,
+   "round_win_pct": 0.0,
+   "rank": 7
+  },
+  {
+   "name": "SittingDuck",
+   "spec": "terrabots.agents.sitting_duck:SittingDuck",
+   "origin": "demo",
+   "doc": "Stands still and does nothing.",
+   "share": 42.4,
+   "round_win_pct": 3.0,
+   "rank": 8
+  },
+  {
+   "name": "RamFire",
+   "spec": "terrabots.agents.ram_fire:RamFire",
+   "origin": "demo",
+   "doc": "Charges the nearest enemy and rams it; weak shots point-blank.",
+   "share": 39.0,
+   "round_win_pct": 0.0,
+   "rank": 9
+  }
+ ],
+ "survival": [
+  {
+   "name": "LevyForager",
+   "spec": "terrabots.agents.levy_forager:LevyForager",
+   "origin": "demo",
+   "doc": "Grazes food in sight; otherwise searches with L\u00e9vy-flight runs.",
+   "avg_lifetime": 220.3,
+   "survivors": 7,
+   "of": 64,
+   "rank": 1
+  },
+  {
+   "name": "Grazer",
+   "spec": "terrabots.agents.grazer:Grazer",
+   "origin": "demo",
+   "doc": "Stays on food until it's eaten; goes for the richest food in sight.",
+   "avg_lifetime": 204.9,
+   "survivors": 5,
+   "of": 64,
+   "rank": 2
+  },
+  {
+   "name": "Sharer",
+   "spec": "terrabots.agents.sharer:Sharer",
+   "origin": "demo",
+   "doc": "Grazes; shares rich food finds with creatures it can see; follows tips.",
+   "avg_lifetime": 171.1,
+   "survivors": 3,
+   "of": 64,
+   "rank": 3
+  },
+  {
+   "name": "WandererAgent",
+   "spec": "bots.wanderer:WandererAgent",
+   "origin": "template",
+   "doc": "Walk to the nearest visible food; otherwise wander randomly.",
+   "avg_lifetime": 147.8,
+   "survivors": 0,
+   "of": 64,
+   "rank": 4
+  }
+ ]
+}

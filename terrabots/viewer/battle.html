@@ -499,7 +499,8 @@ function renderBots() {
   const battle = setupMode === 'battle';
   const pool = battle ? availableBots : survAgents, cnt = battle ? counts : survCounts;
   const noun = battle ? 'bot' : 'agent';
-  const groups = { yours: `Your ${noun}s (bots/)`, extra: `Extra ${noun}s`, 'built-in': `Built-in demo ${noun}s` };
+  const groups = { yours: `Your ${noun}s (bots/)`, extra: `Extra ${noun}s`, community: `Community ${noun}s (contrib/)`,
+                  'built-in': `Built-in demo ${noun}s` };
   for (const [src, title] of Object.entries(groups)) {
     const bots = pool.filter(b => b.source === src);
     if (!bots.length) continue;
@@ -910,7 +911,10 @@ function updateSurvival(frame) {
   for (const [key, m] of foodMeshes) if (!seen.has(key)) { scene.remove(m); foodMeshes.delete(key); }
 }
 
-function renderSurvivalBoard(frame) {
+function renderSurvivalBoard(frame, force = false) {
+  const now = performance.now();
+  if (!force && now - lastBoardDraw < 200) return;
+  lastBoardDraw = now;
   const byClass = new Map();
   for (const a of frame.agents) {
     const r = byClass.get(a.class) || { alive: 0, n: 0 };
@@ -1242,7 +1246,11 @@ $('b-terrain').textContent = `Terrain: ${smoothTerrain ? 'smooth' : 'cells'}`;
 // ---------------------------------------------------------------------------
 // HUD, scoreboard, labels
 // ---------------------------------------------------------------------------
-function renderScoreboard(frame) {
+let lastBoardDraw = 0;
+function renderScoreboard(frame, force = false) {
+  const now = performance.now();
+  if (!force && now - lastBoardDraw < 200) return;   // at most 5 redraws a second
+  lastBoardDraw = now;
   const rows = frame.bots.map(b => ({ ...b, total: frame.totals?.[b.id] ?? 0 }))
     .sort((a, b) => (a.state === 'dead') - (b.state === 'dead') || b.total - a.total);
   $('sb-rows').innerHTML = rows.map(b => {
@@ -1257,12 +1265,14 @@ function renderScoreboard(frame) {
       <span class="sc num">${Math.round(b.total)}</span></div>`;
   }).join('');
 }
-$('sb-rows').addEventListener('click', (e) => {
+// pointerdown, not click: rows are redrawn while a battle runs, and a click whose
+// press and release land on different (redrawn) elements never fires.
+$('sb-rows').addEventListener('pointerdown', (e) => {
   const rd = e.target.closest('[data-radar]');
   if (rd) {
     const id = Number(rd.dataset.radar);
     e.shiftKey ? radarOnly(id) : setRadar(id, !radarShown(id));
-    if (lastFrame && mode === 'battle') renderScoreboard(lastFrame);
+    if (lastFrame && mode === 'battle') renderScoreboard(lastFrame, true);
     return;
   }
   const row = e.target.closest('.sb-row'); if (!row) return;

@@ -12,9 +12,9 @@ high ground lets you shoot over cover, and steep slopes stop your tracks.
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f2b33d)](LICENSE)
 
-[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Battle guide](docs/battle-guide.md) · [Survival guide](docs/survival-guide.md)
+[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Battle guide](docs/battle-guide.md) · [Survival guide](docs/survival-guide.md) · [Leaderboard](docs/leaderboard.md)
 
-<img src="docs/assets/battle.png" alt="Six tanks battling on procedural terrain, with radar sweeps and scan lines" width="900">
+<img src="docs/assets/battle.png" alt="Seven tanks battling on the Twin Hills map, with radar sweeps and scan lines" width="900">
 
 </div>
 
@@ -210,6 +210,18 @@ open, is in [docs/arena-spec.md](docs/arena-spec.md).
 - **Console:** <kbd>C</kbd> shows what *your* bots print, pass to `self.log(...)`
   or log with their own loggers (INFO and up), live, per bot, with round and tick.
   Built-in demo bots have no console.
+- **Fog of war:** <kbd>F</kbd> darkens everything the followed bot can't see.
+
+<table>
+<tr>
+<td><img src="docs/assets/mapbuilder.png" alt="Map builder editing the Canyon map"></td>
+<td><img src="docs/assets/console.png" alt="Battle with the console panel showing a bot's log lines"></td>
+</tr>
+<tr>
+<td align="center"><sub>Map builder with the fairness check</sub></td>
+<td align="center"><sub>Console: your bot's output, live</sub></td>
+</tr>
+</table>
 
 ## Use it from Python
 
@@ -260,6 +272,24 @@ the levels of the [survival guide](docs/survival-guide.md). Example agents:
 | `Corners` | camps in the corner it survived best in, remembered across battles (`self.storage` example) | breaking a camper |
 | `Learner` | orbits with random reversals; guess-factor gun that learns per opponent across battles | your movement against a learning gun |
 
+## Leaderboard: submit your bot
+
+Every bot in the repo fights every other one, 1v1 on four maps and all together
+on five, and the survival agents share the same worlds
+([`tools/tournament.py`](tools/tournament.py), seeded, re-run weekly and whenever
+a bot is added). Current top three:
+
+| 1v1 (APS) | Melee (share of points) | Survival (avg. lifetime) |
+|---|---|---|
+| 1. Learner 76.3 | 1. Crazy 168 % | 1. LevyForager 220 |
+| 2. Crazy 74.3 | 2. FirstTank 151 % | 2. Grazer 205 |
+| 3. SpinBot 64.3 | 3. Learner 133 % | 3. Sharer 171 |
+
+Full tables: [docs/leaderboard.md](docs/leaderboard.md). So far it's only the demo
+bots. **Put yours on the board:** add it as `contrib/<your-github-name>/<bot>.py`
+and open a pull request; the rules are in
+[CONTRIBUTING.md](CONTRIBUTING.md#submit-a-bot).
+
 ## Project layout
 
 ```
@@ -271,6 +301,9 @@ terrabots/
   world_terrain.py grid, elevation-aware LOS, passability and climbing
   comms.py         range + LOS gated messaging
   map_generator.py procedural and flat terrain
+  maps.py          map files; built-in maps in map_data/
+contrib/           submitted bots (tournament entrants)
+tools/             tournament.py, make_maps.py
 bots/              your bots (first_tank.py, wanderer.py are templates)
 battles/           battle files (TOML)
 docs/              battle spec, website
@@ -284,7 +317,8 @@ tests/             pytest suite
 - [ ] Teams (comms already exist) and team scoring
 - [x] Bots in subprocesses for isolation and hard time limits
 - [x] Robocode-style AdvancedRobot API for porting Java bots
-- [ ] Map files and a map editor
+- [x] Map files and a map editor
+- [x] Tournament and leaderboard for submitted bots
 - [ ] Gymnasium / PettingZoo wrapper for reinforcement learning
 - [ ] Survival rules inside battles (foraging as an arena option)
 

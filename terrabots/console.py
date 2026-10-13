@@ -81,5 +81,6 @@ def capture(agent, enabled: bool = True) -> Iterator[list[str]]:
 
 
 def is_users_bot(spec_or_module: str) -> bool:
-    """Built-in demo bots live in terrabots.*; everything else is the user's."""
-    return not spec_or_module.startswith("terrabots.")
+    """Built-in demo bots live in terrabots.*, community bots in contrib.*;
+    everything else is the user's own."""
+    return not spec_or_module.startswith(("terrabots.", "contrib."))

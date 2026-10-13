@@ -72,6 +72,12 @@ def discover_bots(extra_specs: list[str] | None = None,
     for path in sorted(_BUILTIN_DIR.glob("*.py")):
         if path.stem != "__init__":
             bots += _bots_in_module(f"terrabots.agents.{path.stem}", "built-in", base)
+    # Community submissions: contrib/<author>/<bot>.py (in a checkout of the repo)
+    contrib = Path("contrib")
+    if contrib.is_dir():
+        for path in sorted(contrib.glob("*/*.py")):
+            if path.stem != "__init__":
+                bots += _bots_in_module(f"contrib.{path.parent.name}.{path.stem}", "community", base)
 
     known = {b.spec for b in bots}
     for spec in extra_specs or []:

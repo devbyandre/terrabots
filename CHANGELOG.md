@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Persistent bot storage (`self.storage`, `bot_data/`, 200 KB quota per bot class).
+- Demo bots: Walls, RamFire, Corners, Learner (battle), Grazer (survival).
+- Viewer: survival mode in the setup screen, fog of war (F), per-tank radar
+  toggles, bot colours (`set_colors`).
+
 ## 0.3.0 — 2026-10-12
 
 ### Added

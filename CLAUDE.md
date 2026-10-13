@@ -69,9 +69,12 @@ terrabots/
     robocode.py         AdvancedRobot: Robocode's queued-command API for ported bots
     isolation.py        ProcessBot: one process per bot (bot_isolation = "process")
     debug.py            DebugCanvas behind agent.draw (Robocode onPaint)
+    storage.py          BotStorage behind agent.storage: JSON per bot class, quota
     discovery.py        finds BattleAgent subclasses in bots/ and terrabots/agents/
     cli.py              terrabots-battle
-  agents/               demo battle bots: SittingDuck, SpinBot, Tracker, Crazy
+  agents/               demo battle bots: SittingDuck, SpinBot, Tracker, Crazy, Walls,
+                        RamFire, Corners (uses storage), Learner (GF gun, storage);
+                        Grazer (survival)
   viewer/               index.html + server.py (survival, broadcast-only);
                         battle.html + battle_server.py (bidirectional, setup/results)
   run.py                terrabots-run (survival CLI)

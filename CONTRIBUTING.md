@@ -32,6 +32,7 @@ Got a bot you're proud of? Put it in the ring. Submitted bots take part in the
 tournament behind the [leaderboard](docs/leaderboard.md) (1v1, melee and
 survival rankings).
 
+Once enough submissions are in, we run the competition and publish the results.
 **Your code stays private unless you say otherwise.** There are two ways in:
 
 ### Private (the default)

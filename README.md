@@ -313,7 +313,8 @@ a bot is added). Current top three:
 | 2. Learner 70.1 | 2. Crazy 152 % | 2. Grazer 169 |
 | 3. Crazy 68.4 | 3. FirstTank 125 % | 3. MuBotSurvival 154 |
 
-Full tables: [docs/leaderboard.md](docs/leaderboard.md). **Put yours on the
+Full tables: [docs/leaderboard.md](docs/leaderboard.md). **Once enough submissions are
+in, we run the competition**; until then the board shows the demo bots and ours. **Put yours on the
 board.** Your code stays private unless you choose to publish it: share a private
 repository and only your bot's name and scores appear, marked closed source. Every
 submitted bot plays in a locked-down [sandbox](docs/sandbox.md). How to submit:

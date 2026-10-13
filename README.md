@@ -12,7 +12,7 @@ high ground lets you shoot over cover, and steep slopes stop your tracks.
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f2b33d)](LICENSE)
 
-[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Rules](#battle-rules) · [Spec](docs/arena-spec.md)
+[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Battle guide](docs/battle-guide.md) · [Survival guide](docs/survival-guide.md)
 
 <img src="docs/assets/battle.png" alt="Six tanks battling on procedural terrain, with radar sweeps and scan lines" width="900">
 
@@ -172,6 +172,12 @@ the setup screen or a battle TOML.
 | Walls, rams | stop the tank; wall damage scales with speed, rams deal 0.6 each; a bot moving away isn't stopped |
 | Inactivity | after 450 ticks without damage, everyone loses 0.1 energy per tick |
 
+**New to this?** The [battle guide](docs/battle-guide.md) explains the rules,
+the physics and strategies from your first radar lock to learning guns, with
+links to the RoboWiki. The [survival guide](docs/survival-guide.md) climbs from
+simple reflexes to reinforcement learning and evolution, each level grounded in
+research on foraging, ecology and AI.
+
 Scoring follows Robocode: survival, last-survivor bonus, bullet and ram damage,
 and kill bonuses (20 % / 30 % of all damage done to the bot you killed). The full spec, including the design decisions and what's still
 open, is in [docs/arena-spec.md](docs/arena-spec.md).
@@ -218,7 +224,10 @@ terrabots-run --agent bots.wanderer:WandererAgent=10
 ```
 
 Start from [`bots/wanderer.py`](bots/wanderer.py) and the `Agent` class in
-[`terrabots/framework/agent.py`](terrabots/framework/agent.py).
+[`terrabots/framework/agent.py`](terrabots/framework/agent.py), then work through
+the levels of the [survival guide](docs/survival-guide.md). Example agents:
+`Grazer` (when to leave a food patch), `LevyForager` (Lévy-flight search),
+`Sharer` (sharing food finds, and why that can backfire).
 
 ## Built-in demo bots
 

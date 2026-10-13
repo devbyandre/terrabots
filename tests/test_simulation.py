@@ -273,3 +273,21 @@ def _run_all():
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_survival_demo_agents_run():
+    from terrabots.agents.grazer import Grazer
+    from terrabots.agents.levy_forager import LevyForager, levy_run_length
+    from terrabots.agents.sharer import Sharer
+    from terrabots.map_generator import procedural
+
+    random.seed(3)
+    sim = Simulation(procedural(32, 32, rng=random), SimConfig())
+    for cls in (Grazer, LevyForager, Sharer):
+        sim.add_agent(cls, count=3)
+    snaps = sim.run(ticks=60)
+    assert snaps[-1].tick == 60
+    rng = random.Random(1)
+    lengths = [levy_run_length(rng) for _ in range(2000)]
+    assert min(lengths) >= 1 and max(lengths) <= 40
+    assert sum(1 for l in lengths if l == 1) > sum(1 for l in lengths if l >= 10)   # heavy head, long tail

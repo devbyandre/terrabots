@@ -144,6 +144,25 @@
     background: #2a1515; border: 1px solid var(--bad); color: #ffd9d4; padding: 8px 14px; border-radius: 8px;
     max-width: calc(100vw - 32px);
   }
+  #console { position: fixed; left: 12px; bottom: 34px; z-index: 6; width: min(520px, calc(100vw - 24px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  #console .con-head { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  #console .con-head h2 { margin: 0; flex: 1; }
+  #console select { background: #0c121c; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; max-width: 220px; }
+  #console button { padding: 2px 8px; }
+  #con-body { height: 190px; overflow: auto; margin: 0; font: 12px/1.45 var(--mono); color: #c9d4e3; white-space: pre-wrap; }
+  #con-body .t { color: #5d6b80; }
+  #editor { position: fixed; top: 12px; left: 12px; z-index: 6; width: 300px; max-height: calc(100vh - 24px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 13px; }
+  #editor .ed-tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+  #editor .ed-tools button { padding: 5px 2px; font-size: 12px; }
+  #editor .ed-tools button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  #editor .ed-row { display: grid; grid-template-columns: 80px 1fr 40px; gap: 6px; align-items: center; margin: 6px 0; color: var(--muted); }
+  #editor .ed-row input[type=text] { grid-column: span 2; background: #0c121c; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; color: var(--text); }
+  #editor .ed-hint { color: #5d6b80; font-size: 12px; margin: 6px 0; }
+  #editor .ed-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  #editor #ed-warn { color: var(--accent); font-size: 12px; padding-left: 16px; }
+  #editor #ed-info { color: var(--muted); font-size: 12px; min-height: 1.2em; }
   #toast.info { background: var(--panel-solid); border-color: var(--accent); color: var(--text); }
   #status { position: fixed; bottom: 10px; left: 12px; z-index: 4; color: #5d6b80; font-size: 12px; }
 
@@ -176,13 +195,47 @@
     <label class="speed">Speed <input id="speed" type="range" min="0" max="300" step="5" value="60" aria-label="Tick delay"><span class="num" id="speed-v">60 ms</span></label>
     <button id="b-radar" title="R: all radars on / off. Per tank: the radar icons in the scoreboard">Radar: all</button>
     <button id="b-top" title="T">Top-down</button>
+    <button id="b-terrain" title="G: smooth surface or the actual game cells">Terrain: smooth</button>
     <button id="b-fog" title="F: see only what the followed bot knows" aria-pressed="false">Fog: off</button>
+    <button id="b-console" title="C: what your own bots print and log">Console</button>
     <button id="b-stop">Stop</button>
   </div>
-  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radars all/none (per tank: scoreboard icons, Shift = only that one) · <kbd>T</kbd> top-down · <kbd>F</kbd> fog of war · <kbd>D</kbd> debug drawings · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
+  <div class="keys"><kbd>Space</kbd> pause · <kbd>N</kbd> step · <kbd>R</kbd> radars all/none (per tank: scoreboard icons, Shift = only that one) · <kbd>T</kbd> top-down · <kbd>F</kbd> fog of war · <kbd>G</kbd> smooth/cells · <kbd>C</kbd> console · <kbd>D</kbd> debug drawings · click a bot to follow / toggle its radar · <kbd>Esc</kbd> free camera</div>
 </div>
 
 <div id="scoreboard" class="hidden"><h2 id="sb-title">Scoreboard</h2><div id="sb-rows"></div></div>
+
+<div id="console" class="hidden" role="log" aria-live="polite">
+  <div class="con-head"><h2>Console</h2><select id="con-bot" aria-label="Bot"></select>
+    <button id="con-clear">Clear</button><button id="con-close" aria-label="Close console">×</button></div>
+  <pre id="con-body"></pre>
+</div>
+
+<div id="editor" class="hidden">
+  <h2>Map builder</h2>
+  <div class="ed-tools" role="radiogroup" aria-label="Tool">
+    <button data-tool="raise" class="on">Raise</button><button data-tool="lower">Lower</button>
+    <button data-tool="smooth">Smooth</button><button data-tool="flatten">Flatten</button>
+  </div>
+  <div class="ed-tools" role="radiogroup" aria-label="Paint">
+    <button data-tool="paint:P">Plain</button><button data-tool="paint:R">Rock</button>
+    <button data-tool="paint:W">Water</button><button data-tool="paint:S">Stairs</button>
+  </div>
+  <label class="ed-row">Brush <input id="ed-radius" type="range" min="1" max="10" value="3"><span id="ed-radius-v" class="num">3</span></label>
+  <label class="ed-row">Strength <input id="ed-strength" type="range" min="1" max="20" value="6"><span id="ed-strength-v" class="num">0.30</span></label>
+  <p class="ed-hint">Left-drag edits, right-drag rotates, wheel zooms. Rock blocks movement; it only blocks sight and bullets where it's high, so raise it too. Steps over 2 can't be climbed.</p>
+  <div class="ed-row"><label for="ed-name">Name</label><input id="ed-name" type="text"></div>
+  <div class="ed-row"><label for="ed-desc">Description</label><input id="ed-desc" type="text"></div>
+  <p id="ed-info" class="num"></p>
+  <ul id="ed-warn"></ul>
+  <div class="ed-buttons">
+    <button id="ed-undo">Undo</button><button id="ed-check">Check</button>
+    <button id="ed-download">Download</button><button id="ed-upload">Load file</button>
+    <input id="ed-file" type="file" accept=".json,application/json" class="hidden">
+    <button id="ed-save" class="primary">Save</button><button id="ed-test">Test in battle</button>
+    <button id="ed-close">Close</button>
+  </div>
+</div>
 <div id="banner" class="hidden"></div>
 <div id="toast" class="hidden"></div>
 <div id="status">Connecting…</div>
@@ -194,12 +247,23 @@
       <div class="tabs" role="tablist" aria-label="Game mode">
         <button role="tab" id="tab-battle" aria-selected="true">Battle</button>
         <button role="tab" id="tab-survival" aria-selected="false">Survival</button>
+        <button role="tab" id="tab-maps" aria-selected="false">Map builder</button>
       </div>
       <h1 id="setup-title">Terra<span>bots</span> battle setup</h1>
       <p id="setup-sub">Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.</p>
     </header>
     <div class="body">
-      <div class="setup-grid">
+      <div id="setup-maps" class="hidden">
+        <div class="fields" style="max-width: 640px">
+          <div class="field"><label for="mb-base">Start from</label><select id="mb-base"></select></div>
+          <div class="field"><label for="mb-name">Name</label><input id="mb-name" type="text" value="My map"></div>
+          <div class="field"><label for="mb-w">Width (cells)</label><input id="mb-w" type="number" class="num" value="48" min="16" max="256"></div>
+          <div class="field"><label for="mb-h">Height (cells)</label><input id="mb-h" type="number" class="num" value="48" min="16" max="256"></div>
+          <div class="field"><label for="mb-seed">Seed (random base)</label><input id="mb-seed" type="number" class="num" value="1"></div>
+        </div>
+        <p class="hint" style="margin-top:8px">Saved maps go to <code>maps/</code> next to where Terrabots runs and appear in the Map setting of battles and survival runs. Existing maps open as a copy; saving under a new name keeps the original.</p>
+      </div>
+      <div class="setup-grid" id="setup-play">
         <section>
           <h2 id="bots-title">Bots</h2>
           <div id="bot-list"></div>
@@ -218,6 +282,7 @@
       <button id="b-load">Load TOML</button>
       <button id="b-save">Save as TOML</button>
       <button id="b-start" class="primary">Start battle</button>
+      <button id="b-open-editor" class="primary hidden">Open map builder</button>
     </footer>
   </div>
 </div>
@@ -260,7 +325,7 @@ const FIELDS = [
   ['Arena', [
     ['width', 'Width (cells)', 'int', 'Arena width, 16–256 cells.'],
     ['height', 'Height (cells)', 'int', 'Arena height, 16–256 cells.'],
-    ['terrain', 'Terrain', ['procedural', 'flat'], 'procedural = hills, lakes, rock; flat = classic Robocode arena.'],
+    ['terrain', 'Map', 'terrain', 'Random = new procedural terrain (the seed makes it repeatable); Flat = classic Robocode arena; or one of the maps (a map sets the size).'],
     ['seed', 'Seed', 'int?', 'Same seed → same terrain, spawns and results. Empty = random.'],
   ]],
   ['Rounds', [
@@ -308,7 +373,7 @@ const FIELDS = [
 const SURVIVAL_FIELDS = [
   ['World', [
     ['size', 'Size (cells)', 'int', 'Square world, 16–256 cells per side.'],
-    ['terrain', 'Terrain', ['procedural', 'flat'], 'procedural = hills, lakes, rock; flat = no terrain.'],
+    ['terrain', 'Map', 'terrain', 'Random = new procedural terrain; Flat = no terrain; or one of the maps (a map sets the size).'],
     ['seed', 'Seed', 'int?', 'Same seed → same world and spawns. Empty = random.'],
     ['max_ticks', 'Max ticks', 'int', 'The run ends here, or earlier when everyone has died.'],
     ['tick_delay_ms', 'Tick delay (ms)', 'int', 'Playback speed.'],
@@ -334,6 +399,7 @@ let ws = null;
 let availableBots = [];       // [{spec, name, doc, source}]
 let counts = {};              // spec -> count
 let setupMode = 'battle';     // which tab the setup screen shows
+let mapsCatalog = [];         // [{id, name, width, height, source, description}]
 let survAgents = [];          // survival agents, same shape as availableBots
 let survCounts = {};
 let battleDraft = null, survDraft = null;   // form values per tab
@@ -383,7 +449,14 @@ function renderSettings(config) {
       const f = document.createElement('div');
       const id = `cfg-${key}`;
       const v = config[key];
-      if (type === 'bool') {
+      if (type === 'terrain') {
+        f.className = 'field';
+        const current = config.terrain === 'map' ? `map:${config.map}` : config.terrain;
+        const opts = [['procedural', 'Random (procedural)'], ['flat', 'Flat']]
+          .concat(mapsCatalog.map(m => [`map:${m.id}`, `${m.name} (${m.width}×${m.height}${m.source === 'yours' ? ', yours' : ''})`]));
+        f.innerHTML = `<label for="${id}" title="${tip}">${label}</label><select id="${id}">${
+          opts.map(([v, t]) => `<option value="${v}" ${v === current ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+      } else if (type === 'bool') {
         f.className = 'field check';
         f.innerHTML = `<input type="checkbox" id="${id}" ${v ? 'checked' : ''}><label for="${id}" title="${tip}">${label}</label>`;
       } else if (Array.isArray(type)) {
@@ -406,7 +479,11 @@ function readSettings() {
   for (const f of document.querySelectorAll('#settings .field')) {
     const key = f.dataset.key, type = f.dataset.type;
     const el = f.querySelector('input, select');
-    if (type === 'bool') out[key] = el.checked;
+    if (type === 'terrain') {
+      const v = el.value;
+      if (v.startsWith('map:')) { out.terrain = 'map'; out.map = v.slice(4); }
+      else { out.terrain = v; out.map = null; }
+    } else if (type === 'bool') out[key] = el.checked;
     else if (type === 'choice') out[key] = el.value;
     else {
       const raw = el.value.trim();
@@ -448,23 +525,31 @@ function renderBots() {
 
 function setSetupMode(m) {
   if (m === setupMode) return;
-  if ($('settings').querySelector('.field')) {
+  if (setupMode !== 'maps' && $('settings').querySelector('.field')) {
     if (setupMode === 'battle') battleDraft = readSettings(); else survDraft = readSettings();
   }
   setupMode = m;
-  const battle = m === 'battle';
-  $('tab-battle').setAttribute('aria-selected', String(battle));
-  $('tab-survival').setAttribute('aria-selected', String(!battle));
-  $('setup-title').innerHTML = `Terra<span>bots</span> ${battle ? 'battle' : 'survival'} setup`;
-  $('setup-sub').textContent = battle
-    ? 'Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.'
-    : 'Creatures forage food, pay metabolism and die at zero energy. Pick agents, tune the world, start.';
+  for (const t of ['battle', 'survival', 'maps']) $(`tab-${t}`).setAttribute('aria-selected', String(t === m));
+  const maps = m === 'maps', battle = m === 'battle';
+  $('setup-maps').classList.toggle('hidden', !maps);
+  $('setup-play').classList.toggle('hidden', maps);
+  $('b-start').classList.toggle('hidden', maps);
+  $('b-open-editor').classList.toggle('hidden', !maps);
+  $('setup-summary').classList.toggle('hidden', maps);
+  for (const id of ['b-load', 'b-save']) $(id).classList.toggle('hidden', !battle);
+  $('setup-title').innerHTML = `Terra<span>bots</span> ${maps ? 'map builder' : battle ? 'battle setup' : 'survival setup'}`;
+  $('setup-sub').textContent = maps
+    ? 'Make or change a map: start from flat ground, random terrain or an existing map, then shape it in 3D.'
+    : battle
+      ? 'Pick bots and how many of each, tune the rules, start. Hover a setting for the Robocode reference value.'
+      : 'Creatures forage food, pay metabolism and die at zero energy. Pick agents, tune the world, start.';
+  if (maps) { renderMapBases(); return; }
   $('bots-title').textContent = battle ? 'Bots' : 'Agents';
   $('b-start').textContent = battle ? 'Start battle' : 'Start survival';
-  for (const id of ['b-load', 'b-save']) $(id).classList.toggle('hidden', !battle);
   renderSettings(battle ? battleDraft : survDraft);
   renderBots();
 }
+$('tab-maps').onclick = () => setSetupMode('maps');
 $('tab-battle').onclick = () => setSetupMode('battle');
 $('tab-survival').onclick = () => setSetupMode('survival');
 
@@ -584,14 +669,80 @@ function cellColor(code, elev, depth) {
   return c.setHSL(0.27 - Math.min(elev / 6, 1) * 0.08, 0.38, 0.24 + Math.min(elev / 6, 1) * 0.14);  // plain
 }
 
+// Terrain is rendered either smooth (default: a heightfield through the cell
+// corners, each the average of the cells around it, so no steps show) or as the
+// actual game cells (flat tops and walls). The game itself is always cell based.
+let smoothTerrain = (() => { try { return localStorage.getItem('terrabots.terrain') !== 'cells'; } catch { return true; } })();
+let terrainCodes = null, terrainDepth = null, cornerHeights = null, vertexCells = null;
+
 function buildTerrain(world) {
-  if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
   W = world.width; H = world.height;
   elevation = decode(world.elevation, Float32Array);
-  const codes = decode(world.terrain, Uint8Array);
-  const depth = decode(world.water_depth, Float32Array);
-  const elevAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : elevation[y * W + x];
+  terrainCodes = decode(world.terrain, Uint8Array);
+  terrainDepth = decode(world.water_depth, Float32Array);
+  rebuildTerrainMesh();
+}
 
+function rebuildTerrainMesh() {
+  if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
+  computeCorners();
+  const geo = smoothTerrain ? smoothGeometry() : cellGeometry();
+  baseColors = new Float32Array(geo.attributes.color.array);
+  fogCells = null;
+  terrainMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    vertexColors: true, flatShading: !smoothTerrain, side: THREE.DoubleSide }));
+  scene.add(terrainMesh);
+  // Arena floor frame so the edge is visible on flat maps.
+  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, 0.02, H)),
+                                       new THREE.LineBasicMaterial({ color: 0x3a4b68 }));
+  frame.position.y = 0.01; terrainMesh.add(frame);
+}
+
+function computeCorners() {
+  cornerHeights = new Float32Array((W + 1) * (H + 1));
+  for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
+    let sum = 0, n = 0;
+    for (const [x, y] of [[i - 1, j - 1], [i, j - 1], [i - 1, j], [i, j]]) {
+      if (x >= 0 && y >= 0 && x < W && y < H) { sum += elevation[y * W + x]; n++; }
+    }
+    cornerHeights[j * (W + 1) + i] = n ? sum / n : 0;
+  }
+}
+
+function smoothGeometry() {
+  const V = (W + 1) * (H + 1);
+  const pos = new Float32Array(V * 3), col = new Float32Array(V * 3);
+  vertexCells = new Int32Array(V * 4).fill(-1);
+  const cellCol = [];
+  for (let i = 0; i < W * H; i++) cellCol.push(cellColor(terrainCodes[i], elevation[i], terrainDepth[i]));
+  for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
+    const v = j * (W + 1) + i;
+    pos[v * 3] = i - W / 2; pos[v * 3 + 1] = cornerHeights[v]; pos[v * 3 + 2] = H / 2 - j;
+    let r = 0, g = 0, b = 0, n = 0;
+    for (const [x, y] of [[i - 1, j - 1], [i, j - 1], [i - 1, j], [i, j]]) {
+      if (x >= 0 && y >= 0 && x < W && y < H) {
+        const c = cellCol[y * W + x]; r += c.r; g += c.g; b += c.b;
+        vertexCells[v * 4 + n] = y * W + x; n++;
+      }
+    }
+    col[v * 3] = r / n; col[v * 3 + 1] = g / n; col[v * 3 + 2] = b / n;
+  }
+  const idx = [];
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const a = j * (W + 1) + i, b = a + 1, c = a + W + 1, d = c + 1;
+    idx.push(a, b, d, a, d, c);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function cellGeometry() {
+  vertexCells = null;
+  const elevAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : elevation[y * W + x];
   const pos = [], col = [];
   const quad = (a, b, c, d, color) => {
     pos.push(...a, ...b, ...c, ...a, ...c, ...d);
@@ -601,7 +752,7 @@ function buildTerrain(world) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, h = elevation[i];
     cellVerts[i] = pos.length / 3;
-    const color = cellColor(codes[i], h, depth[i]);
+    const color = cellColor(terrainCodes[i], h, terrainDepth[i]);
     const x0 = x - W / 2, x1 = x0 + 1, z0 = H / 2 - y, z1 = z0 - 1;   // z1 is north edge
     quad([x0, h, z0], [x1, h, z0], [x1, h, z1], [x0, h, z1], color);
     const side = color.clone().multiplyScalar(0.62);
@@ -614,25 +765,35 @@ function buildTerrain(world) {
     }
   }
   cellVerts[W * H] = pos.length / 3;
-  baseColors = new Float32Array(col);
-  fogCells = null;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
-  terrainMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
-  scene.add(terrainMesh);
-
-  // Arena floor frame so the edge is visible on flat maps.
-  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, 0.02, H)),
-                                       new THREE.LineBasicMaterial({ color: 0x3a4b68 }));
-  frame.position.y = 0.01; terrainMesh.add(frame);
+  return geo;
 }
 
+// Height of the drawn surface at (x, y): bilinear between corners when smooth,
+// the cell's own height otherwise. Everything standing on the ground uses this.
 function groundAt(x, y) {
-  const cx = Math.floor(x), cy = Math.floor(y);
-  if (!elevation || cx < 0 || cy < 0 || cx >= W || cy >= H) return 0;
-  return elevation[cy * W + cx];
+  if (!elevation) return 0;
+  const cx = Math.min(W - 1, Math.max(0, Math.floor(x))), cy = Math.min(H - 1, Math.max(0, Math.floor(y)));
+  if (!smoothTerrain || !cornerHeights) return elevation[cy * W + cx];
+  const fx = Math.min(1, Math.max(0, x - cx)), fy = Math.min(1, Math.max(0, y - cy));
+  const c = (i, j) => cornerHeights[j * (W + 1) + i];
+  const south = c(cx, cy) * (1 - fx) + c(cx + 1, cy) * fx;
+  const north = c(cx, cy + 1) * (1 - fx) + c(cx + 1, cy + 1) * fx;
+  return south * (1 - fy) + north * fy;
+}
+
+function setSmoothTerrain(on) {
+  smoothTerrain = on;
+  try { localStorage.setItem('terrabots.terrain', on ? 'smooth' : 'cells'); } catch {}
+  $('b-terrain').textContent = `Terrain: ${on ? 'smooth' : 'cells'}`;
+  if (elevation) {
+    const fog = fogCells;
+    rebuildTerrainMesh();
+    if (fog) setTerrainFog(fog);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -727,8 +888,8 @@ function makeCreature(a) {
 function updateSurvival(frame) {
   for (const a of frame.agents) {
     const c = creatures.get(a.id); if (!c) continue;
-    c.data = { x: a.x + 0.5, y: a.y + 0.5, z: a.z, energy: a.energy };
-    c.root.position.copy(toScene(c.data.x, c.data.y, a.z));
+    c.data = { x: a.x + 0.5, y: a.y + 0.5, z: groundAt(a.x + 0.5, a.y + 0.5), energy: a.energy };
+    c.root.position.copy(toScene(c.data.x, c.data.y, c.data.z));
     const fr = Math.max(0, Math.min(1, a.energy / (survivalConfig?.initial_energy || 100)));
     const bar = c.tag.querySelector('.bar > i');
     bar.style.width = `${fr * 100}%`; bar.style.background = `hsl(${fr * 120}, 70%, 50%)`;
@@ -804,7 +965,7 @@ function radarWedge(t, bot) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); geo.setIndex(idx);
   const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
     color: t.scanColor, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
-  mesh.position.copy(toScene(bot.x, bot.y, bot.z + 0.6));
+  mesh.position.copy(toScene(bot.x, bot.y, groundAt(bot.x, bot.y) + 0.6));
   scene.add(mesh);
   t.wedges.unshift(mesh);
   while (t.wedges.length > RADAR_TRAIL) { const old = t.wedges.pop(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
@@ -814,8 +975,8 @@ function radarWedge(t, bot) {
 function updateTanks(frame) {
   for (const bot of frame.bots) {
     const t = tanks.get(bot.id); if (!t) continue;
-    t.data = bot;
-    t.root.position.copy(toScene(bot.x, bot.y, bot.z));
+    t.data = { ...bot, z: groundAt(bot.x, bot.y) };
+    t.root.position.copy(toScene(bot.x, bot.y, t.data.z));
     t.hull.rotation.y = headingRad(bot.heading);
     t.turret.rotation.y = headingRad(bot.gun);
     t.radar.rotation.y = headingRad(bot.radar);
@@ -971,7 +1132,15 @@ function setTerrainFog(cells) {
   const colors = terrainMesh.geometry.attributes.color;
   const arr = colors.array;
   const visible = cells ? new Set(cells) : null;
-  for (let i = 0; i < W * H; i++) {
+  if (vertexCells) {             // smooth: a corner is lit if any cell around it is visible
+    const V = vertexCells.length / 4;
+    for (let v = 0; v < V; v++) {
+      let lit = visible === null;
+      for (let k = 0; k < 4 && !lit; k++) { const c = vertexCells[v * 4 + k]; if (c >= 0 && visible.has(c)) lit = true; }
+      const f = lit ? 1 : FOG_DIM;
+      arr[v * 3] = baseColors[v * 3] * f; arr[v * 3 + 1] = baseColors[v * 3 + 1] * f; arr[v * 3 + 2] = baseColors[v * 3 + 2] * f;
+    }
+  } else for (let i = 0; i < W * H; i++) {
     const k = visible === null || visible.has(i) ? 1 : FOG_DIM;
     for (let v = cellVerts[i] * 3; v < cellVerts[i + 1] * 3; v++) arr[v] = baseColors[v] * k;
   }
@@ -1017,7 +1186,7 @@ function applyBattleFog(frame) {
     const show = b.id === pov.id || seen.has(b.id) || b.state === 'dead';   // deaths are announced to all
     t.root.visible = show;
     t.tag.style.visibility = show ? '' : 'hidden';
-    if (seen.has(b.id)) lastSeen.set(b.id, { x: b.x, y: b.y, z: b.z, tick: frame.tick });
+    if (seen.has(b.id)) lastSeen.set(b.id, { x: b.x, y: b.y, z: groundAt(b.x, b.y), tick: frame.tick });
     const known = lastSeen.get(b.id);
     if (!show && known && frame.tick - known.tick < GHOST_TICKS && b.state !== 'dead') {
       const g = ghostFor(b.id, t.color);
@@ -1067,6 +1236,8 @@ function syncPov() {   // survival needs the server to send the followed creatur
   if (mode === 'survival') send({ type: 'set_pov', id: fogOn ? followId : null });
 }
 $('b-fog').onclick = () => setFog(!fogOn);
+$('b-terrain').onclick = () => setSmoothTerrain(!smoothTerrain);
+$('b-terrain').textContent = `Terrain: ${smoothTerrain ? 'smooth' : 'cells'}`;
 
 // ---------------------------------------------------------------------------
 // HUD, scoreboard, labels
@@ -1158,10 +1329,13 @@ function resetCamera() { topDown = true; toggleTopDown(); }
 
 window.addEventListener('keydown', (e) => {
   if (!$('setup').classList.contains('hidden') || e.target.tagName === 'INPUT') return;
+  if (editing && e.key !== 'g' && e.key !== 'G') return;
   if (e.code === 'Space') { e.preventDefault(); $('b-pause').click(); }
   else if (e.key === 'n' || e.key === 'N') $('b-step').click();
   else if (e.key === 'r' || e.key === 'R') toggleRadar();
   else if (e.key === 't' || e.key === 'T') toggleTopDown();
+  else if (e.key === 'g' || e.key === 'G') setSmoothTerrain(!smoothTerrain);
+  else if (e.key === 'c' || e.key === 'C') toggleConsole();
   else if (e.key === 'f' || e.key === 'F') setFog(!fogOn);
   else if (e.key === 'd' || e.key === 'D') showAllDrawings = !showAllDrawings;
   else if (e.key === 'Escape') { followId = null; syncPov(); }
@@ -1199,7 +1373,7 @@ function showSurvivalResults(msg) {
     msg.results.map(r => `<tr>${SURVIVAL_COLS.map(([k]) => `<td class="${k === 'class' ? '' : 'num'}">${r[k]}</td>`).join('')}</tr>`).join('') +
     '</tbody>';
   const c = msg.config;
-  $('results-sub').textContent = `Ended at tick ${msg.tick} · ${c.size}×${c.size} ${c.terrain} · seed ${c.seed ?? 'random'}`;
+  $('results-sub').textContent = `Ended at tick ${msg.tick} · ${c.terrain === 'map' ? 'map ' + c.map : `${c.size}×${c.size} ${c.terrain}`} · seed ${c.seed ?? 'random'}`;
   $('results-saved').textContent = '';
   lastStart = { mode: 'survival', config: msg.config, agents: msg.agents };
   $('results').classList.remove('hidden');
@@ -1213,11 +1387,207 @@ function showResults(msg) {
     msg.results.map(r => `<tr>${RESULT_COLS.map(([k]) => `<td class="${k === 'name' ? '' : 'num'}">${fmt(k, r[k])}</td>`).join('')}</tr>`).join('') +
     '</tbody>';
   const c = msg.config;
-  $('results-sub').textContent = `${c.rounds} rounds · ${c.width}×${c.height} ${c.terrain} · seed ${c.seed ?? 'random'} · energy return: ${c.hit_energy_return}`;
+  $('results-sub').textContent = `${c.rounds} rounds · ${c.terrain === 'map' ? 'map ' + c.map : `${c.width}×${c.height} ${c.terrain}`} · seed ${c.seed ?? 'random'} · energy return: ${c.hit_energy_return}`;
   $('results-saved').textContent = msg.saved_to ? `Saved to ${msg.saved_to}` : '';
   lastStart = { mode: 'battle', config: msg.config, bots: msg.bots };
   $('results').classList.remove('hidden');
 }
+
+// ===========================================================================
+// Console: what the user's own bots print and log
+// ===========================================================================
+const consoleLines = new Map();     // bot id -> [html lines]
+let consoleOwners = [];             // [{id, name}]
+let consoleRound = 0;
+const CONSOLE_KEEP = 1000;
+
+function resetConsole(owners) {
+  consoleLines.clear();
+  consoleOwners = owners;
+  const sel = $('con-bot'), keep = sel.value;
+  sel.innerHTML = owners.length
+    ? owners.map(o => `<option value="${o.id}">${o.name}</option>`).join('')
+    : '<option value="">no bots of yours here</option>';
+  if (owners.some(o => String(o.id) === keep)) sel.value = keep;
+  renderConsole();
+}
+function addConsole(frame) {
+  for (const [id, lines] of Object.entries(frame.console || {})) {
+    const buf = consoleLines.get(Number(id)) || [];
+    const where = consoleRound ? `r${consoleRound} t${frame.tick}` : `t${frame.tick}`;
+    for (const l of lines) buf.push(`<span class="t">${where}</span> ${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}`);
+    if (buf.length > CONSOLE_KEEP) buf.splice(0, buf.length - CONSOLE_KEEP);
+    consoleLines.set(Number(id), buf);
+    if (String(id) === $('con-bot').value) renderConsole();
+  }
+}
+function renderConsole() {
+  const body = $('con-body');
+  if (!consoleOwners.length) {
+    body.innerHTML = '<span class="t">Built-in demo bots have no console. Your own bots (bots/, or your packages) show what they print, self.log(...) and their loggers here.</span>';
+    return;
+  }
+  const atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 4;
+  body.innerHTML = (consoleLines.get(Number($('con-bot').value)) || []).join('\n') || '<span class="t">nothing yet</span>';
+  if (atEnd) body.scrollTop = body.scrollHeight;
+}
+function toggleConsole() { $('console').classList.toggle('hidden'); renderConsole(); }
+$('b-console').onclick = toggleConsole;
+$('con-close').onclick = () => $('console').classList.add('hidden');
+$('con-bot').onchange = renderConsole;
+$('con-clear').onclick = () => { consoleLines.set(Number($('con-bot').value), []); renderConsole(); };
+
+// ===========================================================================
+// Map builder
+// ===========================================================================
+const LETTER = ['P', 'R', 'W', 'S'], CODE = { P: 0, R: 1, W: 2, S: 3 };
+let editing = false, edTool = 'raise', edDown = false, edPending = null, edFlat = null;
+const edUndo = [];
+let edMeta = { name: 'My map', description: '' };
+
+function renderMapBases() {
+  $('mb-base').innerHTML = '<option value="flat">Flat ground</option><option value="procedural">Random terrain (seed)</option>'
+    + mapsCatalog.map(m => `<option value="map:${m.id}">Copy of ${m.name} (${m.width}×${m.height})</option>`).join('');
+}
+$('b-open-editor').onclick = () => {
+  const base = $('mb-base').value;
+  send(base.startsWith('map:') ? { type: 'map_new', base: 'map', id: base.slice(4) }
+    : { type: 'map_new', base, width: Number($('mb-w').value), height: Number($('mb-h').value),
+        seed: Number($('mb-seed').value), name: $('mb-name').value });
+};
+
+function openEditor(data, warnings) {
+  editing = true;
+  mode = 'editor';
+  W = data.width; H = data.height;
+  elevation = new Float32Array(W * H); terrainCodes = new Uint8Array(W * H); terrainDepth = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    elevation[i] = data.elevation[y][x];
+    terrainCodes[i] = CODE[data.terrain[y][x]];
+    terrainDepth[i] = data.water_depth ? data.water_depth[y][x] : (terrainCodes[i] === 2 ? 0.6 : 0);
+  }
+  edMeta = { name: data.name || $('mb-name').value || 'My map', description: data.description || '' };
+  $('ed-name').value = edMeta.name; $('ed-desc').value = edMeta.description;
+  edUndo.length = 0;
+  clearBattle();
+  rebuildTerrainMesh();
+  resetCamera();
+  $('setup').classList.add('hidden'); $('results').classList.add('hidden');
+  $('hud').classList.add('hidden'); $('scoreboard').classList.add('hidden'); $('console').classList.add('hidden');
+  $('editor').classList.remove('hidden');
+  controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  showWarnings(warnings);
+}
+function closeEditor() {
+  editing = false;
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  $('editor').classList.add('hidden');
+  setSetupMode('maps'); showSetup();
+}
+function showWarnings(list) {
+  $('ed-warn').innerHTML = (list && list.length) ? list.map(w => `<li>${w}</li>`).join('') : '<li style="color:var(--good)">No problems found.</li>';
+}
+function mapData() {
+  const rows = (f) => Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => f(y * W + x)));
+  const data = { format: 'terrabots-map/1', name: $('ed-name').value || 'My map', description: $('ed-desc').value,
+    author: '', width: W, height: H,
+    elevation: rows(i => Math.round(elevation[i] * 100) / 100),
+    terrain: Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => LETTER[terrainCodes[y * W + x]]).join('')) };
+  if ([...terrainCodes].some((c, i) => c === 2 && Math.abs(terrainDepth[i] - 0.6) > 1e-6)) data.water_depth = rows(i => terrainDepth[i]);
+  return data;
+}
+
+// Tools work on cells within the brush, weighted by a soft falloff.
+function applyBrush(cx, cy) {
+  const r = Number($('ed-radius').value), k = Number($('ed-strength').value) / 20;
+  const cells = [];
+  for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(H - 1, Math.ceil(cy + r)); y++)
+    for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(W - 1, Math.ceil(cx + r)); x++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (d <= r) cells.push([y * W + x, 1 - (d / r) ** 2]);
+    }
+  if (edTool.startsWith('paint:')) {
+    const code = CODE[edTool.slice(6)];
+    for (const [i] of cells) { terrainCodes[i] = code; terrainDepth[i] = code === 2 ? 0.6 : 0; }
+    return;
+  }
+  const before = Float32Array.from(elevation);
+  for (const [i, f] of cells) {
+    const x = i % W, y = (i - x) / W;
+    if (edTool === 'raise') elevation[i] = Math.min(20, elevation[i] + 0.6 * k * f);
+    else if (edTool === 'lower') elevation[i] = Math.max(0, elevation[i] - 0.6 * k * f);
+    else if (edTool === 'flatten' && edFlat !== null) elevation[i] += (edFlat - elevation[i]) * k * f;
+    else if (edTool === 'smooth') {
+      let sum = 0, n = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < W && ny < H) { sum += before[ny * W + nx]; n++; }
+      }
+      elevation[i] += (sum / n - elevation[i]) * k * f;
+    }
+  }
+}
+function cellUnderPointer(e) {
+  const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = terrainMesh && raycaster.intersectObject(terrainMesh, false)[0];
+  if (!hit) return null;
+  return [hit.point.x + W / 2, H / 2 - hit.point.z];
+}
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!editing || e.button !== 0) return;
+  const c = cellUnderPointer(e); if (!c) return;
+  edUndo.push([Float32Array.from(elevation), Uint8Array.from(terrainCodes), Float32Array.from(terrainDepth)]);
+  if (edUndo.length > 30) edUndo.shift();
+  edFlat = edTool === 'flatten' ? elevation[Math.floor(c[1]) * W + Math.floor(c[0])] : null;
+  edDown = true; edPending = c;
+});
+window.addEventListener('pointerup', () => { edDown = false; });
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!editing) return;
+  const c = cellUnderPointer(e);
+  if (c) {
+    const x = Math.floor(c[0]), y = Math.floor(c[1]);
+    if (x >= 0 && y >= 0 && x < W && y < H)
+      $('ed-info').textContent = `cell ${x}, ${y} · height ${elevation[y * W + x].toFixed(2)} · ${['plain', 'rock', 'water', 'stairs'][terrainCodes[y * W + x]]}`;
+  }
+  if (edDown && c) edPending = c;
+});
+function editorFrame() {           // apply at most one brush step per frame, then redraw
+  if (editing && edDown && edPending) { applyBrush(...edPending); rebuildTerrainMesh(); }
+}
+for (const b of document.querySelectorAll('#editor [data-tool]')) {
+  b.onclick = () => {
+    edTool = b.dataset.tool;
+    for (const o of document.querySelectorAll('#editor [data-tool]')) o.classList.toggle('on', o === b);
+  };
+}
+$('ed-radius').oninput = (e) => { $('ed-radius-v').textContent = e.target.value; };
+$('ed-strength').oninput = (e) => { $('ed-strength-v').textContent = (e.target.value / 20).toFixed(2); };
+$('ed-undo').onclick = () => {
+  const last = edUndo.pop(); if (!last) return;
+  [elevation, terrainCodes, terrainDepth] = last; rebuildTerrainMesh();
+};
+$('ed-check').onclick = () => send({ type: 'map_check', map: mapData() });
+$('ed-save').onclick = () => send({ type: 'map_save', map: mapData() });
+$('ed-test').onclick = () => { edTestAfterSave = true; send({ type: 'map_save', map: mapData() }); };
+$('ed-close').onclick = closeEditor;
+$('ed-download').onclick = () => {
+  const data = mapData();
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'map'}.json`; a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('ed-upload').onclick = () => $('ed-file').click();
+$('ed-file').onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try { openEditor(JSON.parse(await file.text()), []); send({ type: 'map_check', map: mapData() }); }
+  catch (err) { toast(`Not a map file: ${err.message}`); }
+  e.target.value = '';
+};
+let edTestAfterSave = false;
 
 // ===========================================================================
 // WebSocket
@@ -1231,6 +1601,7 @@ function connect() {
     switch (msg.type) {
       case 'hello':
         availableBots = msg.bots;
+        mapsCatalog = msg.maps || [];
         survAgents = msg.survival.agents;
         survDraft = msg.survival.defaults;
         survCounts = {};
@@ -1244,6 +1615,19 @@ function connect() {
       case 'bot_list': availableBots = msg.bots; renderBots(); break;
       case 'toml_parsed': applyBattleFile(msg.config, msg.bots); break;
       case 'error': toast(msg.message); break;
+      case 'map_data': openEditor(msg.map, msg.warnings); break;
+      case 'map_checked': showWarnings(msg.warnings); break;
+      case 'map_saved':
+        mapsCatalog = msg.maps; showWarnings(msg.warnings);
+        toast(`Saved as ${msg.path}. It's in the Map list of battles and survival runs now.`, 'info');
+        if (edTestAfterSave) {
+          edTestAfterSave = false;
+          editing = false; $('editor').classList.add('hidden');
+          controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+          battleDraft = { ...(battleDraft || {}), terrain: 'map', map: msg.id };
+          setupMode = 'maps'; setSetupMode('battle'); showSetup();
+        }
+        break;
       case 'paused': setPaused(msg.paused); break;
       case 'survival_start': {
         mode = 'survival';
@@ -1255,6 +1639,8 @@ function connect() {
         clearBattle();
         buildTerrain(msg.world);
         for (const a of msg.agents) creatures.set(a.id, makeCreature(a));
+        consoleRound = 0;
+        resetConsole(msg.agents.filter(a => a.owned).map(a => ({ id: a.id, name: a.name })));
         followId = null; resetCamera();
         if (fogOn) setFog(true);
         $('h-round').textContent = 'Survival';
@@ -1265,7 +1651,7 @@ function connect() {
       case 'survival_tick':
         $('h-tick').textContent = `tick ${msg.tick} · ${msg.n_alive} alive`;
         lastFrame = msg;
-        updateSurvival(msg); renderSurvivalBoard(msg); applySurvivalFog(msg);
+        updateSurvival(msg); renderSurvivalBoard(msg); applySurvivalFog(msg); addConsole(msg);
         break;
       case 'survival_end':
         banner(`Survival over <small>tick ${msg.tick}</small>`, 1200);
@@ -1282,6 +1668,8 @@ function connect() {
         buildTerrain(msg.world);
         for (const b of msg.bots) tanks.set(b.id, makeTank(b));
         updateRadarButton();
+        consoleRound = msg.round;
+        if (msg.round === 1) resetConsole(msg.bots.filter(b => b.owned).map(b => ({ id: b.id, name: b.name })));
         if (firstRound) { followId = null; resetCamera(); }
         $('h-round').textContent = `Round ${msg.round} / ${msg.rounds}`;
         $('speed').value = msg.config.tick_delay_ms; $('speed-v').textContent = `${msg.config.tick_delay_ms} ms`;
@@ -1292,7 +1680,7 @@ function connect() {
         $('h-tick').textContent = `tick ${msg.tick}`;
         lastFrame = msg;
         updateTanks(msg); updateBullets(msg); handleEvents(msg); renderScoreboard(msg); renderDrawings(msg);
-        applyBattleFog(msg);
+        applyBattleFog(msg); addConsole(msg);
         $('h-inactive').classList.toggle('hidden', !msg.inactive);
         break;
       case 'round_end': {
@@ -1318,6 +1706,7 @@ let lastT = performance.now();
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  editorFrame();
   if (followId !== null) {
     const d = tanks.get(followId)?.data || creatures.get(followId)?.data;
     if (d) {

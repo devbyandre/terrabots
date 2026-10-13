@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Type
 
 from terrabots.comms import CommsMgr, MessageType
+from terrabots.console import capture
 from terrabots.framework.actions import Action, MoveDirection, Shout
 from terrabots.framework.agent import Agent
 from terrabots.framework.observation import (
@@ -123,6 +124,8 @@ class Simulation:
         # (cell, eye height, range) -> visible TerrainPercepts; terrain is static
         self._terrain_cache: dict[tuple, list[TerrainPercept]] = {}
         self.last_observations: dict[int, Observation] = {}
+        self.console_ids: set[int] = set()        # agents whose prints/logs a viewer wants
+        self.last_console: dict[int, list[str]] = {}
 
         self._seed_resources()
 
@@ -207,8 +210,12 @@ class Simulation:
 
         # 2. Collect decisions (all agents decide before any action is applied)
         decisions: dict[int, Action] = {}
+        self.last_console = {}
         for agent in alive_agents:
-            decisions[agent.agent_id] = agent.decide(observations[agent.agent_id])
+            with capture(agent, agent.agent_id in self.console_ids) as lines:
+                decisions[agent.agent_id] = agent.decide(observations[agent.agent_id])
+            if lines:
+                self.last_console[agent.agent_id] = lines
 
         # 3. Clear last tick's comms mailboxes before new sends
         self._comms.clear()

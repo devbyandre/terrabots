@@ -193,6 +193,24 @@ open, is in [docs/arena-spec.md](docs/arena-spec.md).
 </tr>
 </table>
 
+## Maps, map builder and console
+
+- **Maps:** the setup screen's *Map* setting offers random terrain (repeatable
+  with a seed), a flat arena, or a map: seven built-in ones (Arena, Twin Hills,
+  Ridge, Lakes, Fortress, Canyon, Badlands) and your own. In a battle file:
+  `terrain = "map"` and `map = "fortress"`.
+- **Map builder:** the setup screen's third tab. Start from flat ground, random
+  terrain or a copy of a map, then shape it in 3D: raise, lower, smooth, flatten,
+  paint plain / rock / water / stairs. *Check* warns about areas a tank can't
+  reach; *Save* writes `maps/<name>.json`, which then appears in the Map setting.
+  The format is plain JSON (see [`terrabots/maps.py`](terrabots/maps.py));
+  `tools/make_maps.py` builds the built-in maps from code.
+- **Smooth or cells:** terrain is drawn as a smooth surface; <kbd>G</kbd> switches
+  to the actual game cells, which is what the rules use.
+- **Console:** <kbd>C</kbd> shows what *your* bots print, pass to `self.log(...)`
+  or log with their own loggers (INFO and up), live, per bot, with round and tick.
+  Built-in demo bots have no console.
+
 ## Use it from Python
 
 ```python

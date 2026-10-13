@@ -11,6 +11,7 @@ services:
       - ./battles:/app/battles:ro
       - ./results:/app/results       # results/*.json and *.csv land on the host
       - ./bot_data:/app/bot_data     # bots' persistent storage survives restarts
+      - ./maps:/app/maps             # maps saved in the map builder
     restart: unless-stopped
 
   survival:

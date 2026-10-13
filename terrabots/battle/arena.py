@@ -66,6 +66,7 @@ from terrabots.battle.physics import (
 )
 from terrabots.battle.scoring import BotScore, RoundScorer
 from terrabots.comms import CommsMgr, MessageType
+from terrabots.console import capture
 from terrabots.world_terrain import MovementResolver, VisibilityMgr, WorldGrid
 
 logger = logging.getLogger(__name__)
@@ -92,6 +93,7 @@ class _Slot:
         self.killer: int | None = None         # last bot that damaged us
         self.killed_by_ram = False
         self.drawings: list[dict[str, Any]] = []
+        self.console: list[str] = []
 
 
 def _empty_events() -> dict[str, list]:
@@ -101,12 +103,13 @@ def _empty_events() -> dict[str, list]:
 class Arena:
     def __init__(self, config: BattleConfig, world: WorldGrid, agents: list[BattleAgent],
                  round_number: int, rng: random.Random,
-                 time_budget_ms: float | None = None) -> None:
+                 time_budget_ms: float | None = None, console_ids: set[int] | None = None) -> None:
         self.cfg = config
         self.world = world
         self.round = round_number
         self.tick = 0
         self.time_budget_ms = time_budget_ms
+        self.console_ids = console_ids or set()      # bots whose prints/logs go to the viewer
         self._movement = MovementResolver(world)
         self._visibility = VisibilityMgr(world)
         self._comms = CommsMgr(self._visibility)
@@ -209,6 +212,7 @@ class Arena:
         active = [s for s in standing if s.body.state == ALIVE and not s.switched_off]
         for s in standing:
             s.drawings = []
+            s.console = []
         remote = [s for s in active if isinstance(s.agent, ProcessBot)]
         for s in remote:
             s.agent.request_decide(self._observe(s))
@@ -223,10 +227,13 @@ class Arena:
             if remote:
                 action = s.agent.collect_decide(self.time_budget_ms)
                 elapsed_ms = s.agent.last_elapsed_ms     # measured in the bot's process
+                s.console = list(s.agent.last_console)
             else:
                 obs = self._observe(s)
                 s.agent.draw.clear()
-                action = s.agent.decide(obs)
+                with capture(s.agent, s.body.bot_id in self.console_ids) as lines:
+                    action = s.agent.decide(obs)
+                s.console = lines
                 elapsed_ms = (time.perf_counter() - start) * 1000
             if not isinstance(action, BattleAction):
                 raise TypeError(f"decide() returned {type(action).__name__}, expected BattleAction")
@@ -521,6 +528,7 @@ class Arena:
             ],
             "events": self._frame_events,
             "drawings": {s.body.bot_id: s.drawings for s in self.slots.values() if s.drawings},
+            "console": {s.body.bot_id: s.console for s in self.slots.values() if s.console},
             "inactive": self._ticks_since_damage > self.cfg.inactivity_time > 0,
             "scores": {bid: round(sc.total, 1) for bid, sc in self.scorer.scores.items()},
         }

@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir .
 COPY bots ./bots
 COPY battles ./battles
 
-RUN useradd --create-home terrabots && mkdir -p /app/results /app/bot_data && chown terrabots /app/results /app/bot_data
+RUN useradd --create-home terrabots && mkdir -p /app/results /app/bot_data /app/maps && chown terrabots /app/results /app/bot_data /app/maps
 USER terrabots
 
 EXPOSE 8765

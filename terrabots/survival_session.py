@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from terrabots import map_generator
+from terrabots.console import is_users_bot
 from terrabots.framework.agent import Agent
 from terrabots.framework.simulation import ResourceConfig, SimConfig, Simulation
 
@@ -34,7 +35,8 @@ _RANGES: dict[str, tuple[float, float | None]] = {
 @dataclass
 class SurvivalSettings:
     size: int = 48
-    terrain: str = "procedural"          # "procedural" | "flat"
+    terrain: str = "procedural"          # "procedural" | "flat" | "map"
+    map: str | None = None               # map name when terrain is "map" (sets the size)
     seed: int | None = None
     max_ticks: int = 2000
     tick_delay_ms: int = 60
@@ -48,8 +50,10 @@ class SurvivalSettings:
     spawn_rate: float = 0.3
 
     def __post_init__(self) -> None:
-        if self.terrain not in ("procedural", "flat"):
-            raise SurvivalSettingsError(f"terrain: {self.terrain!r} is not procedural or flat")
+        if self.terrain not in ("procedural", "flat", "map"):
+            raise SurvivalSettingsError(f"terrain: {self.terrain!r} is not procedural, flat or map")
+        if self.terrain == "map" and not self.map:
+            raise SurvivalSettingsError("map: choose a map when terrain is \"map\"")
         if self.seed is not None and (isinstance(self.seed, bool) or not isinstance(self.seed, int)):
             raise SurvivalSettingsError(f"seed: expected an integer or null, got {self.seed!r}")
         for name, (lo, hi) in _RANGES.items():
@@ -81,8 +85,13 @@ class SurvivalSession:
         # Simulation uses the global random module (callers control reproducibility).
         random.seed(settings.seed)
         s = settings
-        self.world = (map_generator.flat(s.size, s.size) if s.terrain == "flat"
-                      else map_generator.procedural(s.size, s.size, rng=random))
+        if s.terrain == "map":
+            from terrabots import maps
+            self.world = maps.load(s.map)
+        elif s.terrain == "flat":
+            self.world = map_generator.flat(s.size, s.size)
+        else:
+            self.world = map_generator.procedural(s.size, s.size, rng=random)
         self.sim = Simulation(self.world, SimConfig(
             metabolism_per_tick=s.metabolism_per_tick, initial_energy=s.initial_energy,
             resource=ResourceConfig(initial_density=s.initial_density, max_per_cell=s.max_per_cell,
@@ -92,6 +101,8 @@ class SurvivalSession:
         for cls, count in entries:
             for i, agent in enumerate(self.sim.add_agent(cls, count=count)):
                 self.names[agent.agent_id] = f"{cls.__name__} ({i + 1})" if count > 1 else cls.__name__
+                if is_users_bot(cls.__module__):
+                    self.sim.console_ids.add(agent.agent_id)
         self.tick = 0
         self.died_at: dict[int, int] = {}
         self.pov: int | None = None     # viewer's fog of war: whose view to send
@@ -114,6 +125,7 @@ class SurvivalSession:
                         "energy": a["energy"], "alive": a["alive"]} for a in snap.agents],
             "resources": [[int(k.split(",")[0]), int(k.split(",")[1]), v]
                           for k, v in snap.resources.items()],
+            "console": self.sim.last_console,
         }
         obs = self.sim.last_observations.get(self.pov) if self.pov is not None else None
         if obs is not None:
@@ -127,7 +139,8 @@ class SurvivalSession:
         return frame
 
     def agents_info(self) -> list[dict[str, Any]]:
-        return [{"id": aid, "name": name, "class": type(self.sim._agents[aid]).__name__}
+        return [{"id": aid, "name": name, "class": type(self.sim._agents[aid]).__name__,
+                 "owned": aid in self.sim.console_ids}
                 for aid, name in self.names.items()]
 
     def results(self) -> list[dict[str, Any]]:

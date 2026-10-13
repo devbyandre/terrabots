@@ -26,9 +26,7 @@ class FirstTank(BattleAgent):
 
         enemy = obs.scanned_bots[0]
         aim = normalize_angle(enemy.bearing - obs.gun_heading)   # how far to turn the gun
-        return BattleAction(
-            velocity=0.3,
-            body_turn=4,
-            gun_turn=aim,
-            fire=2.0 if abs(aim) < 5 else 0.0,
-        )
+        fire = 2.0 if abs(aim) < 5 and obs.gun_heat == 0 else 0.0
+        if fire:
+            self.log(f"firing at {enemy.name}, {enemy.distance:.1f} cells away")   # shows in the console (C)
+        return BattleAction(velocity=0.3, body_turn=4, gun_turn=aim, fire=fire)

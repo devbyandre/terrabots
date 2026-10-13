@@ -7,6 +7,10 @@
 - Demo bots: Walls, RamFire, Corners, Learner (battle), Grazer (survival).
 - Viewer: survival mode in the setup screen, fog of war (F), per-tank radar
   toggles, bot colours (`set_colors`).
+- Maps: JSON map files, seven built-in maps, map selection for battles and
+  survival runs, an in-browser map builder with a playability check.
+- Smooth terrain rendering (G toggles the game cells), bot consoles (C) for
+  your own bots' prints, `self.log()` and logs.
 
 ## 0.3.0 — 2026-10-12
 

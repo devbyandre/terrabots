@@ -32,6 +32,7 @@ from terrabots.battle.actions import BattleAction
 from terrabots.battle.agent import BattleAgent
 from terrabots.battle.config import BattleConfig
 from terrabots.battle.observation import BattleObservation, TerrainView
+from terrabots.console import capture
 from terrabots.world_terrain import MovementResolver, WorldGrid
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
         kind = msg[0]
         try:
             if kind == "round":
-                _, bot_id, name, rules, round_number, rounds = msg
+                _, bot_id, name, rules, round_number, rounds, console = msg
                 agent = cls()
                 agent.bot_id, agent.name, agent.memory, agent.rules = bot_id, name, memory, rules
                 agent.storage = storage
@@ -103,12 +104,13 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
                 obs.terrain = TerrainView(world, movement, agent.profile, obs.x, obs.y)
                 agent.draw.clear()
                 start = time.perf_counter()
-                action = agent.decide(obs)
+                with capture(agent, console) as lines:
+                    action = agent.decide(obs)
                 elapsed_ms = (time.perf_counter() - start) * 1000
                 if not isinstance(action, BattleAction):
                     raise TypeError(f"decide() returned {type(action).__name__}, expected BattleAction")
                 conn.send(("action", seq, action, agent.draw.shapes, elapsed_ms,
-                           agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn))
+                           agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn, lines))
             elif kind == "death":
                 if agent is not None:
                     agent.on_death()
@@ -149,6 +151,8 @@ class ProcessBot(BattleAgent):
         self._seq = 0
         self._dead = False
         self.last_elapsed_ms = 0.0
+        self.console = False          # capture prints/logs (set by the runner)
+        self.last_console: list[str] = []
 
     @property
     def is_dead(self) -> bool:
@@ -164,7 +168,7 @@ class ProcessBot(BattleAgent):
     # --- lifecycle hooks -------------------------------------------------
 
     def on_round_start(self, round_number: int, rounds: int) -> None:
-        self._send(("round", self.bot_id, self.name, self.rules, round_number, rounds))
+        self._send(("round", self.bot_id, self.name, self.rules, round_number, rounds, self.console))
         reply = self._recv(START_TIMEOUT_S, "on_round_start")
         if reply[0] != "ok":
             raise BotProcessError(f"{self.name} failed in on_round_start:\n{reply[1]}")
@@ -198,7 +202,7 @@ class ProcessBot(BattleAgent):
                 continue  # stale answer from a turn we already gave up on
             if reply[0] == "decide_error":
                 raise BotProcessError(reply[2])
-            _, _, action, shapes, self.last_elapsed_ms, adj_gun, adj_radar = reply
+            _, _, action, shapes, self.last_elapsed_ms, adj_gun, adj_radar, self.last_console = reply
             self.draw.shapes = shapes
             self.adjust_gun_for_body_turn, self.adjust_radar_for_gun_turn = adj_gun, adj_radar
             return action

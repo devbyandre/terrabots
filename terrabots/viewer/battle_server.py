@@ -11,10 +11,12 @@ can control it.
 
 Client -> server: list_bots, start_battle {config, bots}, parse_toml {text},
                   start_survival {config, agents},
+                  map_new {base, width, height, seed, id}, map_check {map}, map_save {map},
                   pause, resume, step, set_speed {tick_delay_ms}, set_pov {id}, stop_battle
 Server -> client: hello {defaults, bots, survival}, bot_list, toml_parsed, error,
                   round_start {world, ...}, tick, round_end, battle_end, stopped,
-                  survival_start {world, agents, config}, survival_tick, survival_end
+                  survival_start {world, agents, config}, survival_tick, survival_end,
+                  map_data {map, warnings}, map_checked {warnings}, map_saved {id, warnings, maps}
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ from websockets.http11 import Request, Response
 
 from terrabots.battle.config import BattleConfigError, BattleFile
 from terrabots.battle.discovery import discover_bots
+from terrabots import maps
 from terrabots.battle.runner import BattleRunner
 from terrabots.framework.agent import Agent
 from terrabots.survival_session import SurvivalSession, SurvivalSettings, SurvivalSettingsError
@@ -130,6 +133,7 @@ class BattleServer:
                 "defaults": {"config": self.defaults.config.to_dict(),
                              "bots": [{"spec": b.spec, "count": b.count} for b in self.defaults.bots]},
                 "bots": [b.to_dict() for b in discover_bots(self.extra_specs)],
+                "maps": maps.catalog(),
                 "survival": {"defaults": SurvivalSettings().to_dict(),
                              "agents": [b.to_dict() for b in
                                         discover_bots(self.extra_agents, base=Agent)]},
@@ -144,7 +148,7 @@ class BattleServer:
             async for raw in ws:
                 try:
                     await self._on_message(ws, json.loads(raw))
-                except (ValueError, KeyError, TypeError) as exc:
+                except (ValueError, KeyError, TypeError, OSError) as exc:
                     await ws.send(json.dumps({"type": "error", "message": str(exc)}))
         finally:
             self._connections.discard(ws)
@@ -175,6 +179,18 @@ class BattleServer:
         elif kind == "step":
             self._paused = True
             self._step_requested.set()
+        elif kind == "map_new":
+            await ws.send(json.dumps(self._map_new(msg)))
+        elif kind == "map_check":
+            data = msg["map"]
+            maps.validate(data)
+            await ws.send(json.dumps({"type": "map_checked", "warnings": maps.check(maps.to_world(data))}))
+        elif kind == "map_save":
+            data = msg["map"]
+            path = maps.save(data)
+            await ws.send(json.dumps({"type": "map_saved", "id": path.stem, "path": str(path),
+                                      "warnings": maps.check(maps.to_world(data)),
+                                      "maps": maps.catalog()}))
         elif kind == "set_pov":
             # Fog of war: whose view survival frames should include (None = off).
             self._pov = msg.get("id")
@@ -194,8 +210,9 @@ class BattleServer:
             bf = BattleFile.from_dict({**config, "bots": bots})
             # Starting bot processes takes a moment; keep the event loop responsive.
             runner = await asyncio.to_thread(BattleRunner, bf.config, bf.bots,
-                                             time_budget_ms=self.time_budget_ms, data_dir=self.data_dir)
-        except (BattleConfigError, ValueError, ImportError, AttributeError, RuntimeError) as exc:
+                                             time_budget_ms=self.time_budget_ms, data_dir=self.data_dir,
+                                             console=True)
+        except (BattleConfigError, ValueError, ImportError, AttributeError, RuntimeError, OSError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
             return
         await self._stop()
@@ -203,6 +220,25 @@ class BattleServer:
         self._paused = False
         self._tick_delay_ms = bf.config.tick_delay_ms
         self._task = asyncio.create_task(self._run(runner, bf))
+
+    @staticmethod
+    def _map_new(msg: dict[str, Any]) -> dict[str, Any]:
+        """A starting point for the map builder: flat, procedural or an existing map."""
+        import random as _random
+
+        from terrabots import map_generator
+
+        base = msg.get("base", "flat")
+        if base == "map":
+            data = maps.read(str(msg["id"]))
+        else:
+            w, h = int(msg.get("width", 48)), int(msg.get("height", 48))
+            if not (16 <= w <= 256 and 16 <= h <= 256):
+                raise ValueError("width and height must be from 16 to 256")
+            world = (map_generator.procedural(w, h, rng=_random.Random(msg.get("seed")))
+                     if base == "procedural" else map_generator.flat(w, h))
+            data = maps.from_world(world, msg.get("name") or "New map")
+        return {"type": "map_data", "map": data, "warnings": maps.check(maps.to_world(data))}
 
     async def _start_survival(self, config: dict[str, Any], agents: list[dict[str, Any]]) -> None:
         try:
@@ -216,7 +252,7 @@ class BattleServer:
                         raise ValueError(f"{a['spec']} is not a survival Agent")
                     entries.append((cls, count))
             session = await asyncio.to_thread(SurvivalSession, settings, entries)
-        except (SurvivalSettingsError, ValueError, ImportError, AttributeError, RuntimeError) as exc:
+        except (SurvivalSettingsError, ValueError, ImportError, AttributeError, RuntimeError, OSError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
             return
         await self._stop()
@@ -290,6 +326,7 @@ class BattleServer:
                     "world": world, "config": bf.config.to_dict(),
                     "bots": [{"id": bid, "name": name, "class": cls.__name__,
                               "colors": dict(arena.slots[bid].agent.colors),
+                              "owned": bid in arena.console_ids,
                               "view": arena.slots[bid].agent.profile.max_perception_range}
                              for bid, (cls, name) in enumerate(runner.names)],
                 })

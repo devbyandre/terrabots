@@ -59,6 +59,13 @@ class BattleAgent(abc.ABC):
         self.rules: BattleConfig = BattleConfig()   # replaced by the battle's rules
         self.draw = DebugCanvas()
         self.colors: dict[str, str] = {}
+        self._console: list[str] = []
+
+
+    def log(self, *parts: object) -> None:
+        """Write a line to this bot's console in the viewer (like print())."""
+        if len(self._console) < 200:
+            self._console.append(" ".join(str(p) for p in parts))
 
     def on_round_start(self, round_number: int, rounds: int) -> None:
         """Called once per round after bot_id, name and memory are set."""

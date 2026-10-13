@@ -27,7 +27,7 @@ from typing import Any
 PX_PER_CELL = 16.0
 
 _CHOICES: dict[str, tuple[str, ...]] = {
-    "terrain": ("procedural", "flat"),
+    "terrain": ("procedural", "flat", "map"),
     "damage_formula": ("robocode", "linear"),
     "hit_energy_return": ("damage", "robocode", "none"),
     "bot_isolation": ("none", "process"),
@@ -81,7 +81,9 @@ class BattleConfig:
     # --- Arena ---
     width: int = 48
     height: int = 48
-    terrain: str = "procedural"          # "procedural" | "flat"
+    terrain: str = "procedural"          # "procedural" | "flat" | "map" (then `map` names it)
+    map: str | None = None               # map name (./maps/ or built-in) or .json path;
+                                         # a map sets the arena size itself
     seed: int | None = None              # same seed -> same terrain, spawns, results
 
     # --- Rounds ---
@@ -150,6 +152,10 @@ class BattleConfig:
                 raise BattleConfigError(f"{name}: expected a number, got {value!r}")
             if (lo is not None and value < lo) or (hi is not None and value > hi):
                 raise BattleConfigError(f"{name}: {value} outside [{lo}, {hi if hi is not None else '∞'}]")
+        if self.terrain == "map" and not self.map:
+            raise BattleConfigError("map: choose a map when terrain is \"map\"")
+        if self.map is not None and not isinstance(self.map, str):
+            raise BattleConfigError(f"map: expected a map name, got {self.map!r}")
         if self.min_bullet_power > self.max_bullet_power:
             raise BattleConfigError("min_bullet_power: must not exceed max_bullet_power")
         if self.seed is not None and (isinstance(self.seed, bool) or not isinstance(self.seed, int)):

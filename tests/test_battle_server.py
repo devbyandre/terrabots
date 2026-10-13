@@ -124,3 +124,15 @@ def test_survival_pov_frame_is_what_the_agent_observes() -> None:
     assert frame["pov"]["id"] == 0
     assert sorted(frame["pov"]["agents"]) == sorted(a.agent_id for a in obs.visible_agents)
     assert len(frame["pov"]["cells"]) == len(obs.visible_terrain)
+
+
+def test_map_builder_messages(tmp_path, monkeypatch) -> None:
+    from terrabots import maps
+
+    monkeypatch.setattr(maps, "USER_DIR", tmp_path)
+    new = BattleServer._map_new({"base": "procedural", "width": 20, "height": 18, "seed": 2, "name": "T"})
+    assert new["type"] == "map_data" and new["map"]["width"] == 20 and new["map"]["height"] == 18
+    copy = BattleServer._map_new({"base": "map", "id": "ridge"})
+    assert copy["map"]["name"] == "Ridge" and copy["warnings"] == []
+    path = maps.save(new["map"])
+    assert path.parent == tmp_path and any(m["id"] == path.stem and m["source"] == "yours" for m in maps.catalog())

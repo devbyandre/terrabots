@@ -38,3 +38,20 @@ class Remember(BattleAgent):
 
     def decide(self, obs):
         return BattleAction()
+
+
+import logging as _logging
+
+_log = _logging.getLogger(__name__)
+
+
+class Chatty(BattleAgent):
+    """Talks to its console: print, self.log and its module logger."""
+
+    def decide(self, obs):
+        if obs.tick == 2:
+            print("hello from print")
+            self.log("tick", obs.tick)
+            _log.info("from the logger")
+            _log.debug("too detailed, not shown")
+        return BattleAction()

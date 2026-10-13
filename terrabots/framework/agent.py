@@ -58,6 +58,13 @@ class Agent(abc.ABC):
         self.pos: tuple[int, int] = (0, 0)
         self.energy: float = 100.0
         self.alive: bool = True
+        self._console: list[str] = []
+
+
+    def log(self, *parts: object) -> None:
+        """Write a line to this bot's console in the viewer (like print())."""
+        if len(self._console) < 200:
+            self._console.append(" ".join(str(p) for p in parts))
 
     # ------------------------------------------------------------------
     # Lifecycle hooks -- override as needed

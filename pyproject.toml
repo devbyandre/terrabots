@@ -50,6 +50,7 @@ include = ["terrabots*"]
 
 [tool.setuptools.package-data]
 "terrabots.viewer" = ["index.html", "battle.html"]
+"terrabots" = ["map_data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -39,6 +39,7 @@ from terrabots.battle.arena import Arena
 from terrabots.battle.config import BattleConfig, BotEntry
 from terrabots.battle.isolation import ProcessBot, spec_of, start_bots
 from terrabots.battle.storage import BotStorage
+from terrabots.console import is_users_bot
 
 
 def storage_key(cls: type) -> str:
@@ -70,6 +71,9 @@ def load_bot_class(spec: str) -> type[BattleAgent]:
 
 
 def build_world(config: BattleConfig, rng: random.Random) -> WorldGrid:
+    if config.terrain == "map":
+        from terrabots import maps
+        return maps.load(config.map)
     if config.terrain == "flat":
         return map_generator.flat(config.width, config.height)
     return map_generator.procedural(config.width, config.height, rng=rng)
@@ -129,8 +133,9 @@ class BattleRunner:
                  bots: list[tuple[type[BattleAgent], int]] | list[BotEntry],
                  time_budget_ms: float | None | str = "config",
                  on_round_start: Callable[[Arena], None] | None = None,
-                 data_dir: str | None = None) -> None:
+                 data_dir: str | None = None, console: bool = False) -> None:
         self.config = config
+        self.console = console      # capture the user's bots' prints/logs for the viewer
         self.data_dir = data_dir    # bot storage root; None = in memory only
         self.entries: list[tuple[type[BattleAgent], int]] = [
             (load_bot_class(b.spec), b.count) if isinstance(b, BotEntry) else b for b in bots
@@ -198,8 +203,13 @@ class BattleRunner:
                 agent.memory = self.memory[cls]
                 agent.storage = self.storages[cls]
             agents.append(agent)
+        console_ids = {bid for bid, (cls, _) in enumerate(self.names)
+                       if self.console and is_users_bot(cls.__module__)}
+        for bid in console_ids:
+            if self.processes:
+                self.processes[bid].console = True
         self.arena = Arena(self.config, self.world, agents, self.round, self.rng,
-                           time_budget_ms=self.time_budget_ms)
+                           time_budget_ms=self.time_budget_ms, console_ids=console_ids)
         self.arena_finished = False
         for agent in agents:
             agent.on_round_start(self.round, self.config.rounds)

@@ -32,6 +32,12 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+notebooks = [
+    "jupyterlab>=4.0",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "nbmake>=1.5",
+]
 ml = [
     "torch>=2.2",
 ]

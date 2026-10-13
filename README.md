@@ -12,9 +12,9 @@ high ground lets you shoot over cover, and steep slopes stop your tracks.
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f2b33d)](LICENSE)
 
-[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Battle guide](docs/battle-guide.md) · [Survival guide](docs/survival-guide.md) · [Leaderboard](docs/leaderboard.md)
+[Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Notebooks](notebooks/) · [Battle guide](docs/battle-guide.md) · [Survival guide](docs/survival-guide.md) · [Leaderboard](docs/leaderboard.md)
 
-<img src="docs/assets/battle.png" alt="Seven tanks battling on the Twin Hills map, with radar sweeps and scan lines" width="900">
+<img src="docs/assets/battle.gif" alt="Animated battle on the Twin Hills map: tanks circle, radar sweeps and bullets fly" width="800">
 
 </div>
 
@@ -225,6 +225,9 @@ open, is in [docs/arena-spec.md](docs/arena-spec.md).
 
 ## Use it from Python
 
+The [notebooks](notebooks/) are the hands-on version of this section: your first
+tank, a seeded experiment with confidence intervals, and a survival study.
+
 ```python
 from terrabots.battle import BattleConfig, BattleRunner
 from terrabots.agents.tracker import Tracker
@@ -304,6 +307,7 @@ terrabots/
   maps.py          map files; built-in maps in map_data/
 contrib/           submitted bots (tournament entrants)
 tools/             tournament.py, make_maps.py
+notebooks/         Jupyter lessons (first tank, analysing battles, survival)
 bots/              your bots (first_tank.py, wanderer.py are templates)
 battles/           battle files (TOML)
 docs/              battle spec, website

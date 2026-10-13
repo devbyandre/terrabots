@@ -92,6 +92,14 @@ def check_available(image: str = IMAGE) -> None:
     if r.returncode != 0:
         raise SandboxError(f"sandbox image {image!r} missing; build it with: "
                            f"docker build -t {image} -f docker/sandbox.Dockerfile docker/")
+    # Without kernel support Docker accepts --memory / --pids-limit and silently
+    # ignores them (Raspberry Pi OS ships like that), so check instead of trusting.
+    r = subprocess.run(["docker", "info", "--format", "{{.MemoryLimit}} {{.PidsLimit}}"],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or r.stdout.split() != ["true", "true"]:
+        raise SandboxError("Docker can't enforce memory and process limits here, so the sandbox "
+                           "won't run. On a Raspberry Pi add 'cgroup_enable=memory cgroup_memory=1' to "
+                           "/boot/firmware/cmdline.txt and reboot")
 
 
 def bot_mount(entry: SandboxEntry) -> tuple[Path, str]:

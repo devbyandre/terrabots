@@ -1,0 +1,9 @@
+[Unit]
+Description=Terrabots offline tournament from /dev/%I
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/terrabots/trigger.sh /dev/%I
+TimeoutStartSec=infinity

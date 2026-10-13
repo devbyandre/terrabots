@@ -74,9 +74,10 @@ def _doc(c: type) -> str:
     return doc.splitlines()[0] if doc else ""
 
 
-def entrants(extra: list[str] = (), extra_agents: list[str] = ()) -> tuple[list[dict], list[dict]]:
+def entrants(extra: list[str] = (), extra_agents: list[str] = (), skip_ours: bool = False,
+             submissions: Path | None = None) -> tuple[list[dict], list[dict]]:
     """(battle bots, survival agents) as [{spec, name, origin, doc, run}], run being
-    "local" (imported here) or "sandbox"."""
+    "local" (imported here) or "sandbox". `submissions` defaults to ROOT/submissions."""
     from terrabots.battle.agent import BattleAgent
     from terrabots.battle.sandbox import find_bots
     from terrabots.framework.agent import Agent
@@ -86,7 +87,7 @@ def entrants(extra: list[str] = (), extra_agents: list[str] = ()) -> tuple[list[
     ours = [(f"terrabots.agents.{p.stem}", "demo") for p in sorted((ROOT / "terrabots/agents").glob("*.py"))
             if p.stem != "__init__"]
     ours += [(f"bots.{p.stem}", "template") for p in sorted((ROOT / "bots").glob("*.py")) if p.stem != "__init__"]
-    for module, origin in ours:
+    for module, origin in ([] if skip_ours else ours):
         for c in _classes(module, BattleAgent):
             battle.append({"spec": f"{module}:{c.__name__}", "name": c.__name__, "origin": origin, "doc": _doc(c), "run": "local"})
         for c in _classes(module, Agent):
@@ -98,7 +99,8 @@ def entrants(extra: list[str] = (), extra_agents: list[str] = ()) -> tuple[list[
             out.append({"spec": spec, "name": name, "origin": f"{author or 'private'} (closed source)", "doc": "",
                         "run": "local"})
     for folder, public in (("contrib", True), ("submissions", False)):
-        for path in sorted((ROOT / folder).glob("*/*.py")):
+        base = submissions if folder == "submissions" and submissions is not None else ROOT / folder
+        for path in sorted(base.glob("*/*.py")):
             if path.stem == "__init__" or path.parent.is_symlink() or path.is_symlink():
                 continue
             author = path.parent.name
@@ -185,13 +187,14 @@ def main() -> None:
                     help="your own battle bot, closed source (imported here, so only bots you trust)")
     ap.add_argument("--extra-agent", action="append", default=[], metavar="SPEC[@AUTHOR]",
                     help="your own survival agent, closed source")
+    ap.add_argument("--skip-ours", action="store_true", help="leave out the demo bots and templates")
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--out", type=Path, default=ROOT / "docs")
     a = ap.parse_args()
     duel_rounds, melee_rounds, seeds = (3, 3, 1) if a.quick else (10, 10, 2)
     surv_seeds, surv_ticks = (4, 300) if a.quick else (16, 600)
 
-    bots, agents = entrants(a.extra, a.extra_agent)
+    bots, agents = entrants(a.extra, a.extra_agent, a.skip_ours)
     sandboxed = sum(e["run"] == "sandbox" for e in bots + agents)
     if sandboxed:
         from terrabots.battle.sandbox import SandboxError, check_available

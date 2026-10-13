@@ -12,3 +12,5 @@ bot_data/
 
 # Private bot submissions: run by the tournament, never committed
 submissions/
+# Manifests of packed tournament drives (tools/airgap)
+.airgap/

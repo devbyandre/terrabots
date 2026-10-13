@@ -6,7 +6,7 @@ Perception rules (docs/arena-spec.md §5):
   no 360° vision of bots.
 - Terrain is static and visible within the bot's perception range, through the
   read-only `terrain` view. Unlike survival mode this does not LOS-check every
-  cell; computing that per tick for every bot is the cost issue noted in CLAUDE.md,
+  cell; computing that per tick for every bot is the cost issue survival mode has,
   and for path planning knowing nearby ground heights is enough.
 """
 

@@ -22,7 +22,7 @@ pytest -q
   explain why rather than what. Simple beats clever.
 - **Keep the invariants.** Agents decide on the same pre-tick state; agents only
   see what they perceive (no global state in observations); line of sight is
-  elevation only. `CLAUDE.md` lists them all.
+  elevation only. The module docstrings describe them.
 - **Templates stay tiny.** `bots/first_tank.py` and `bots/wanderer.py` are the
   first files a learner reads.
 

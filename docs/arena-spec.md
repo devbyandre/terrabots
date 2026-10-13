@@ -6,7 +6,7 @@ cells; firing is capped at remaining energy so a bot can shoot itself to exactly
 0 and become disabled (§4); `foraging_enabled` not built; procedural tanks
 instead of the GLB (§11). It describes the
 Robocode-style battle mode requested on 2026-10-12. Defaults marked *(decision)*
-were chosen by Claude so work can start; André can override any of them — see
+were chosen as defaults so work could start and can be overridden — see
 [§9 Open decisions](#9-open-decisions).
 
 ## 1. Goal

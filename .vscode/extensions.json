@@ -3,7 +3,6 @@
     "ms-python.python",
     "ms-python.debugpy",
     "ms-python.vscode-pylance",
-    "charliermarsh.ruff",
-    "anthropic.claude-code"
+    "charliermarsh.ruff"
   ]
 }

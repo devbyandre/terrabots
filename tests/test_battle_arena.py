@@ -321,3 +321,16 @@ def test_kill_bonus_is_share_of_all_damage_to_victim() -> None:
     score = arena.scorer.scores[0]
     assert score.bullet_damage == pytest.approx(10.0)
     assert score.bullet_kill_bonus == pytest.approx(0.2 * 10.0)
+
+
+def test_all_demo_bots_play_without_errors(tmp_path) -> None:
+    from terrabots.battle.config import BotEntry
+
+    specs = ["walls:Walls", "ram_fire:RamFire", "corners:Corners", "learner:Learner",
+             "tracker:Tracker", "crazy:Crazy", "spin_bot:SpinBot", "sitting_duck:SittingDuck"]
+    cfg = BattleConfig(rounds=2, seed=5, max_ticks_per_round=400, terrain="procedural")
+    rows = BattleRunner(cfg, [BotEntry("terrabots.agents." + s) for s in specs],
+                        time_budget_ms=None, data_dir=str(tmp_path)).run().rows
+    assert all(r["skipped_turns"] == 0 for r in rows)
+    assert (tmp_path / "terrabots.agents.corners.Corners" / "corners.json").exists()
+    assert (tmp_path / "terrabots.agents.learner.Learner" / "guess_factors.json").exists()

@@ -228,6 +228,10 @@ Start from [`bots/wanderer.py`](bots/wanderer.py) and the `Agent` class in
 | `SpinBot` | circles, spins its gun, fires at anything it sweeps | basic dodging |
 | `Tracker` | radar lock, head-on aim, holds ~10 cells distance | movement against a steady gun |
 | `Crazy` | erratic zig-zags, linear-prediction gun | both: hard to hit, hits back |
+| `Walls` | drives clockwise along the arena edges, gun pointing inwards (`AdvancedRobot` example) | dealing with a wall-hugger |
+| `RamFire` | charges the nearest bot and rams it | keeping distance, ram scoring |
+| `Corners` | camps in the corner it survived best in, remembered across battles (`self.storage` example) | breaking a camper |
+| `Learner` | orbits with random reversals; guess-factor gun that learns per opponent across battles | your movement against a learning gun |
 
 ## Project layout
 

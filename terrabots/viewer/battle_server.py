@@ -11,7 +11,7 @@ can control it.
 
 Client -> server: list_bots, start_battle {config, bots}, parse_toml {text},
                   start_survival {config, agents},
-                  pause, resume, step, set_speed {tick_delay_ms}, stop_battle
+                  pause, resume, step, set_speed {tick_delay_ms}, set_pov {id}, stop_battle
 Server -> client: hello {defaults, bots, survival}, bot_list, toml_parsed, error,
                   round_start {world, ...}, tick, round_end, battle_end, stopped,
                   survival_start {world, agents, config}, survival_tick, survival_end
@@ -89,6 +89,8 @@ class BattleServer:
         self._tick_delay_ms = defaults.config.tick_delay_ms
         self._last_round_start: str | None = None
         self._last_frame: str | None = None
+        self._pov: int | None = None
+        self._survival: SurvivalSession | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -171,6 +173,11 @@ class BattleServer:
         elif kind == "step":
             self._paused = True
             self._step_requested.set()
+        elif kind == "set_pov":
+            # Fog of war: whose view survival frames should include (None = off).
+            self._pov = msg.get("id")
+            if self._survival is not None:
+                self._survival.pov = self._pov
         elif kind == "set_speed":
             self._tick_delay_ms = max(0, min(5000, int(msg["tick_delay_ms"])))
         elif kind == "stop_battle":
@@ -213,6 +220,8 @@ class BattleServer:
         await self._stop()
         self._paused = False
         self._tick_delay_ms = settings.tick_delay_ms
+        session.pov = self._pov
+        self._survival = session
         self._task = asyncio.create_task(self._run_survival(session, agents))
 
     async def _stop(self) -> None:
@@ -223,6 +232,7 @@ class BattleServer:
             except asyncio.CancelledError:
                 pass
         self._task = None
+        self._survival = None
         self._last_round_start = self._last_frame = None
 
     async def _broadcast(self, msg: dict[str, Any] | str) -> None:
@@ -277,7 +287,8 @@ class BattleServer:
                     "type": "round_start", "round": runner.round, "rounds": bf.config.rounds,
                     "world": world, "config": bf.config.to_dict(),
                     "bots": [{"id": bid, "name": name, "class": cls.__name__,
-                              "colors": dict(arena.slots[bid].agent.colors)}
+                              "colors": dict(arena.slots[bid].agent.colors),
+                              "view": arena.slots[bid].agent.profile.max_perception_range}
                              for bid, (cls, name) in enumerate(runner.names)],
                 })
                 await self._broadcast(self._last_round_start)

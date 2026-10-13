@@ -122,6 +122,7 @@ class Simulation:
         self._messages_sent_this_tick: int = 0
         # (cell, eye height, range) -> visible TerrainPercepts; terrain is static
         self._terrain_cache: dict[tuple, list[TerrainPercept]] = {}
+        self.last_observations: dict[int, Observation] = {}
 
         self._seed_resources()
 
@@ -201,6 +202,8 @@ class Simulation:
                 agent.on_message(msg.sender_id, msg.type.name, msg.payload)
             obs = self._build_observation(agent, inbox)
             observations[agent.agent_id] = obs
+        # Kept for spectators (the viewer's fog of war); agents never see this.
+        self.last_observations = observations
 
         # 2. Collect decisions (all agents decide before any action is applied)
         decisions: dict[int, Action] = {}

@@ -110,3 +110,17 @@ def test_survival_settings_validation() -> None:
         SurvivalSettings(size=4)
     with pytest.raises(SurvivalSettingsError, match="foo"):
         SurvivalSettings.from_dict({"foo": 1})
+
+
+def test_survival_pov_frame_is_what_the_agent_observes() -> None:
+    from terrabots.agents.grazer import Grazer
+    from terrabots.survival_session import SurvivalSession, SurvivalSettings
+
+    session = SurvivalSession(SurvivalSettings(size=24, seed=3, max_ticks=5), [(Grazer, 4)])
+    assert "pov" not in session.step()
+    session.pov = 0
+    frame = session.step()
+    obs = session.sim.last_observations[0]
+    assert frame["pov"]["id"] == 0
+    assert sorted(frame["pov"]["agents"]) == sorted(a.agent_id for a in obs.visible_agents)
+    assert len(frame["pov"]["cells"]) == len(obs.visible_terrain)

@@ -94,6 +94,7 @@ class SurvivalSession:
                 self.names[agent.agent_id] = f"{cls.__name__} ({i + 1})" if count > 1 else cls.__name__
         self.tick = 0
         self.died_at: dict[int, int] = {}
+        self.pov: int | None = None     # viewer's fog of war: whose view to send
 
     @property
     def over(self) -> bool:
@@ -105,7 +106,7 @@ class SurvivalSession:
         for a in snap.agents:
             if not a["alive"] and a["id"] not in self.died_at:
                 self.died_at[a["id"]] = snap.tick
-        return {
+        frame = {
             "type": "survival_tick", "tick": snap.tick, "n_alive": snap.n_alive,
             "messages": snap.n_messages_sent,
             "agents": [{"id": a["id"], "name": self.names[a["id"]], "class": a["class"],
@@ -114,6 +115,16 @@ class SurvivalSession:
             "resources": [[int(k.split(",")[0]), int(k.split(",")[1]), v]
                           for k, v in snap.resources.items()],
         }
+        obs = self.sim.last_observations.get(self.pov) if self.pov is not None else None
+        if obs is not None:
+            w = self.world.width
+            frame["pov"] = {
+                "id": self.pov,
+                "cells": [t.pos[1] * w + t.pos[0] for t in obs.visible_terrain],
+                "agents": [a.agent_id for a in obs.visible_agents],
+                "food": [list(r.pos) for r in obs.visible_resources],
+            }
+        return frame
 
     def agents_info(self) -> list[dict[str, Any]]:
         return [{"id": aid, "name": name, "class": type(self.sim._agents[aid]).__name__}

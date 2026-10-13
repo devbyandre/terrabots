@@ -12,6 +12,16 @@ Robocode scoring (RoboWiki: Robocode/Scoring), per round and summed per battle.
 
 "All the damage" is read literally (bullet + ram damage to that bot). 1sts, 2nds
 and 3rds don't add points; they show how often a bot placed.
+
+Teams: every bot belongs to a team; a bot fighting alone is a team of one, which
+gives exactly the rules above. With real teams:
+- Damage to a teammate scores nothing and earns no kill bonus (friendly fire
+  still hurts).
+- Survival points go to standing bots when a bot of *another* team dies.
+- The last-survivor bonus goes to each standing member of the last team, 10 per
+  enemy bot.
+- Places are team places: every member of the winning team gets a 1st.
+A team's score is the sum of its members' scores.
 """
 
 from __future__ import annotations
@@ -19,6 +29,7 @@ from __future__ import annotations
 import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import Hashable
 
 SURVIVAL_PER_DEATH = 50.0
 LAST_SURVIVOR_PER_ENEMY = 10.0
@@ -75,20 +86,32 @@ class BotScore:
 class RoundScorer:
     """Accumulates scoring events during one round."""
     scores: dict[int, BotScore]
+    teams: dict[int, Hashable] = field(default_factory=dict)   # bot id -> team; missing = alone
     # all damage dealt, by (attacker, victim), for kill bonuses
     _dealt: dict[tuple[int, int], float] = field(default_factory=lambda: defaultdict(float))
     death_order: list[int] = field(default_factory=list)
+    team_ranking: list[Hashable] = field(default_factory=list)   # set by finish(), 1st first
+
+    def team_of(self, bot_id: int) -> Hashable:
+        return self.teams.get(bot_id, ("solo", bot_id))
+
+    def friends(self, a: int, b: int) -> bool:
+        return a != b and self.team_of(a) == self.team_of(b)
 
     def shot(self, shooter: int) -> None:
         self.scores[shooter].shots += 1
 
     def bullet_hit(self, shooter: int, victim: int, dealt: float) -> None:
+        if self.friends(shooter, victim):
+            return
         s = self.scores[shooter]
         s.hits += 1
         s.bullet_damage += dealt
         self._dealt[(shooter, victim)] += dealt
 
     def ram(self, rammer: int, victim: int, dealt: float) -> None:
+        if self.friends(rammer, victim):
+            return
         self.scores[rammer].ram_damage += dealt
         self._dealt[(rammer, victim)] += dealt
 
@@ -96,8 +119,9 @@ class RoundScorer:
               survivors: list[int]) -> None:
         self.death_order.append(victim)
         for bot_id in survivors:
-            self.scores[bot_id].survival += SURVIVAL_PER_DEATH
-        if killer is not None and killer != victim:
+            if self.team_of(bot_id) != self.team_of(victim):
+                self.scores[bot_id].survival += SURVIVAL_PER_DEATH
+        if killer is not None and killer != victim and not self.friends(killer, victim):
             dealt = self._dealt[(killer, victim)]
             if killed_by_ram:
                 self.scores[killer].ram_kill_bonus += RAM_KILL_BONUS * dealt
@@ -105,19 +129,38 @@ class RoundScorer:
                 self.scores[killer].bullet_kill_bonus += BULLET_KILL_BONUS * dealt
 
     def finish(self, survivors_by_energy: list[tuple[int, float]], n_bots: int) -> list[int]:
-        """Award last-survivor bonus and placements. Returns bot ids, 1st place first."""
-        if len(survivors_by_energy) == 1:
-            winner = survivors_by_energy[0][0]
-            self.scores[winner].last_survivor += LAST_SURVIVOR_PER_ENEMY * (n_bots - 1)
-        ranking = [bid for bid, _ in survivors_by_energy] + list(reversed(self.death_order))
-        for place, bot_id in enumerate(ranking[:3]):
-            s = self.scores[bot_id]
-            if place == 0:
-                s.firsts += 1
-            elif place == 1:
-                s.seconds += 1
-            else:
-                s.thirds += 1
+        """Award last-survivor bonus and placements. Returns bot ids, 1st place first
+        (members of a better-placed team before those of a worse one)."""
+        standing: dict[Hashable, list[tuple[int, float]]] = {}
+        for bid, energy in survivors_by_energy:
+            standing.setdefault(self.team_of(bid), []).append((bid, energy))
+        if len(standing) == 1:
+            (team, members), = standing.items()
+            enemies = sum(1 for bid in self.scores if self.team_of(bid) != team)
+            for bid, _ in members:
+                self.scores[bid].last_survivor += LAST_SURVIVOR_PER_ENEMY * enemies
+        # Standing teams by total energy, then teams in reverse order of elimination
+        # (a team is out when its last member dies).
+        order = sorted(standing, key=lambda t: -sum(e for _, e in standing[t]))
+        for bid in reversed(self.death_order):
+            team = self.team_of(bid)
+            if team not in order:
+                order.append(team)
+        self.team_ranking = order
+        alive = [bid for bid, _ in survivors_by_energy]
+        dead_last_first = list(reversed(self.death_order))
+        ranking = [bid for team in order for bid in alive + dead_last_first if self.team_of(bid) == team]
+        for place, team in enumerate(order[:3]):
+            for bid in ranking:
+                if self.team_of(bid) != team:
+                    continue
+                s = self.scores[bid]
+                if place == 0:
+                    s.firsts += 1
+                elif place == 1:
+                    s.seconds += 1
+                else:
+                    s.thirds += 1
         for bot_id, energy in survivors_by_energy:
             self.scores[bot_id].end_energy_sum += energy
         for s in self.scores.values():

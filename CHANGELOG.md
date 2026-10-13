@@ -11,6 +11,18 @@
   survival runs, an in-browser map builder with a playability check.
 - Smooth terrain rendering (G toggles the game cells), bot consoles (C) for
   your own bots' prints, `self.log()` and logs.
+- Teams: `[[teams]]` in battle files and a team picker in the setup screen;
+  leaders (+100 energy), droids (+20, no radar), team messages
+  (`broadcast`/`send`, optional range + line of sight), friendly fire without
+  points, team scoring and a team results table. `TeamRobot` and `Droid` for
+  ported Robocode bots. Demo team: `SquadLeader` + `SquadDroid`.
+- Tournament and leaderboard (`tools/tournament.py`), bot submissions in
+  `contrib/`, Jupyter notebooks, an animated battle in the README.
+
+### Changed
+- Results CSV/JSON have a `team` column (last, so existing scripts keep working).
+- Bot names are numbered when a class appears more than once in a battle, also
+  across teams. Classes whose names start with `_` aren't listed as bots.
 
 ## 0.3.0 — 2026-10-12
 

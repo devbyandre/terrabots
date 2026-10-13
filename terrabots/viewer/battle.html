@@ -76,6 +76,15 @@
   .bot-doc { color: var(--muted); font-size: 12px; }
   .bot-spec { color: #5d6b80; font-size: 11px; font-family: var(--mono); overflow-wrap: anywhere; }
   .counter { display: flex; align-items: center; gap: 4px; }
+  .bot-ctl { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .team-sel { background: #0c121c; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; max-width: 120px; }
+  .pill { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; }
+  .pill.droid { background: #263247; color: #9fb3cf; }
+  .pill.lead { background: rgba(242,179,61,.18); color: var(--accent); }
+  button.pill.make-lead { background: transparent; border: 1px dashed var(--line); color: var(--muted); cursor: pointer; padding: 0 5px; }
+  button.pill.make-lead:hover { color: var(--accent); border-color: var(--accent); }
+  #results-teams { margin-bottom: 18px; }
+  .bot-row .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
   .counter button { width: 28px; height: 28px; padding: 0; }
   .counter .num { width: 22px; text-align: center; }
   .add-spec { display: flex; gap: 6px; margin-top: 6px; }
@@ -129,6 +138,11 @@
   .sb-row .sw { width: 10px; height: 10px; border-radius: 2px; }
   .sb-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sb-row .sc { text-align: right; }
+  .sb-team { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 600; padding: 6px 6px 2px; }
+  .sb-team .sw { width: 10px; height: 10px; border-radius: 50%; }
+  .sb-team .num { margin-left: auto; }
+  .sb-team.out { opacity: .45; }
+  .tag .tm { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; text-shadow: 0 1px 2px #000; }
   .bar { height: 6px; background: #1d2636; border-radius: 3px; overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--good); border-radius: 3px; }
 
@@ -294,7 +308,7 @@
       <h1 id="results-title">Battle results</h1>
       <p id="results-sub"></p>
     </header>
-    <div class="body"><div class="table-wrap"><table class="results" id="results-table"></table></div></div>
+    <div class="body"><div class="table-wrap"><table class="results hidden" id="results-teams"></table><table class="results" id="results-table"></table></div></div>
     <footer>
       <span class="hint" id="results-saved"></span>
       <span class="spacer"></span>
@@ -355,6 +369,11 @@ const FIELDS = [
     ['initial_gun_heat', 'Initial gun heat', 'float', 'Robocode: 3 (no shots for ~30 ticks).'],
     ['gun_cooling_rate', 'Gun cooling / tick', 'float', 'Robocode: 0.1. Heat per shot = 1 + p/5.'],
     ['hit_energy_return', 'Energy back on hit', ['damage', 'robocode', 'none'], 'damage: shooter gains the damage dealt; robocode: 3·power.'],
+  ]],
+  ['Teams', [
+    ['team_leader_bonus', 'Leader bonus', 'float', 'Extra start energy for a team\'s first member. Robocode: +100 (200 in all).'],
+    ['droid_bonus', 'Droid bonus', 'float', 'Extra start energy for droids, which have no radar. Robocode: +20 (120 in all).'],
+    ['team_message_range', 'Team message range', 'float?', 'Empty = teammates hear each other anywhere (Robocode). A number = only within that many cells and in line of sight.'],
   ]],
   ['Radar & rules', [
     ['radar_range', 'Radar range', 'float', 'cells. Robocode: 1200 px = 75 cells.'],
@@ -494,6 +513,28 @@ function readSettings() {
   return out;
 }
 
+const BOT_GROUPS = ['yours', 'extra', 'community', 'built-in'];
+// Bots in the order the setup screen lists them.
+function displayOrder(pool) {
+  return BOT_GROUPS.flatMap(src => pool.filter(b => b.source === src));
+}
+// Team picker: four ready-made teams plus any named in a loaded battle file.
+const TEAM_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
+const TEAM_PALETTE = ['#e5534b', '#4f8ef7', '#57ab5a', '#e0b33a', '#b083f0', '#f0883e', '#39c5cf', '#db61a2'];
+let teamOf = {};                      // spec -> team name ('' = fights alone)
+let teamLeader = {};                  // team name -> spec of its leader (gets the leader bonus)
+let knownTeams = [...TEAM_NAMES];
+// A team's leader: the chosen one while it's still in the team, else the first member listed.
+function leaderOf(team, cnt = counts) {
+  const inTeam = (spec) => cnt[spec] > 0 && teamOf[spec] === team;
+  if (inTeam(teamLeader[team])) return teamLeader[team];
+  return displayOrder(availableBots).map(b => b.spec).concat(Object.keys(cnt)).find(inTeam);
+}
+function teamColor(name) {
+  const i = knownTeams.indexOf(name);
+  return i < 0 ? '#5d6b80' : TEAM_PALETTE[i % TEAM_PALETTE.length];   // grey: a bot alone
+}
+
 function renderBots() {
   const list = $('bot-list'); list.innerHTML = '';
   const battle = setupMode === 'battle';
@@ -501,6 +542,7 @@ function renderBots() {
   const noun = battle ? 'bot' : 'agent';
   const groups = { yours: `Your ${noun}s (bots/)`, extra: `Extra ${noun}s`, community: `Community ${noun}s (contrib/)`,
                   'built-in': `Built-in demo ${noun}s` };
+  const leaders = new Set(battle ? knownTeams.map(t => leaderOf(t)).filter(Boolean) : []);
   for (const [src, title] of Object.entries(groups)) {
     const bots = pool.filter(b => b.source === src);
     if (!bots.length) continue;
@@ -508,13 +550,29 @@ function renderBots() {
     g.innerHTML = `<h2>${title}</h2>`;
     for (const b of bots) {
       const n = cnt[b.spec] || 0;
+      const team = battle && n ? (teamOf[b.spec] || '') : '';
       const row = document.createElement('div');
       row.className = 'bot-row' + (n ? ' active' : '');
-      row.innerHTML = `<div><div class="bot-name">${b.name}</div><div class="bot-doc">${b.doc || ''}</div><div class="bot-spec">${b.spec}</div></div>
-        <div class="counter"><button aria-label="Fewer ${b.name}">−</button><span class="num">${n}</span><button aria-label="More ${b.name}">+</button></div>`;
-      const [minus, plus] = row.querySelectorAll('button');
+      const pills = (battle && b.droid ? '<span class="pill droid" title="Droid: no radar, +20 energy. Needs teammates to tell it where enemies are.">droid</span>' : '')
+        + (leaders.has(b.spec) && n ? `<span class="pill lead" title="Team leader: +100 energy${n > 1 ? ' (the first copy)' : ''}">leader</span>`
+          : team ? '<button class="pill make-lead" title="Make this bot the team leader">make leader</button>' : '');
+      const teamSel = battle && n ? `<select class="team-sel" aria-label="Team of ${b.name}" title="Bots with the same team fight together; the first in this list leads.">
+          <option value="">Alone</option>${knownTeams.map(t => `<option ${t === team ? 'selected' : ''}>${t}</option>`).join('')}</select>` : '';
+      const dot = team ? `<span class="team-dot" style="background:${teamColor(team)}"></span>` : '';
+      row.innerHTML = `<div><div class="bot-name">${dot}${b.name}${pills}</div><div class="bot-doc">${b.doc || ''}</div><div class="bot-spec">${b.spec}</div></div>
+        <div class="bot-ctl"><div class="counter"><button aria-label="Fewer ${b.name}">−</button><span class="num">${n}</span><button aria-label="More ${b.name}">+</button></div>${teamSel}</div>`;
+      const [minus, plus] = row.querySelectorAll('.counter button');
       minus.onclick = () => { cnt[b.spec] = Math.max(0, n - 1); renderBots(); };
       plus.onclick = () => { cnt[b.spec] = Math.min(50, n + 1); renderBots(); };
+      const sel = row.querySelector('.team-sel');
+      if (sel) sel.onchange = () => {
+        teamOf[b.spec] = sel.value;
+        if (sel.value && !leaderOf(sel.value)) teamLeader[sel.value] = b.spec;
+        if (sel.value && leaderOf(sel.value) !== teamLeader[sel.value]) teamLeader[sel.value] = leaderOf(sel.value);
+        renderBots();
+      };
+      const mk = row.querySelector('.make-lead');
+      if (mk) mk.onclick = () => { teamLeader[team] = b.spec; renderBots(); };
       g.appendChild(row);
     }
     list.appendChild(g);
@@ -558,9 +616,12 @@ function applyBattleFile(config, bots) {
   battleDraft = config;
   if (setupMode !== 'battle') { setSetupMode('battle'); }
   renderSettings(config);
-  counts = {};
+  counts = {}; teamOf = {}; teamLeader = {};
   for (const b of bots) {
     counts[b.spec] = (counts[b.spec] || 0) + b.count;
+    if (b.team && !(b.spec in teamOf)) teamOf[b.spec] = b.team;   // one team per bot type here
+    if (b.team && !teamLeader[b.team]) teamLeader[b.team] = b.spec; // a file's first member leads
+    if (b.team && !knownTeams.includes(b.team)) knownTeams.push(b.team);
     if (!availableBots.some(a => a.spec === b.spec)) {
       availableBots.push({ spec: b.spec, name: b.spec.split(':')[1] || b.spec, doc: '', source: 'extra' });
     }
@@ -569,14 +630,27 @@ function applyBattleFile(config, bots) {
 }
 
 function selectedBots(cnt = counts) {
-  return Object.entries(cnt).filter(([, n]) => n > 0).map(([spec, count]) => ({ spec, count }));
+  const battle = cnt === counts;
+  const pool = battle ? availableBots : survAgents;
+  const listed = displayOrder(pool).map(b => b.spec);
+  const order = [...listed, ...Object.keys(cnt).filter(s => !listed.includes(s))];
+  const picked = order.filter(spec => cnt[spec] > 0);
+  if (!battle) return picked.map(spec => ({ spec, count: cnt[spec] }));
+  // The server makes a team's first entry its leader, so leaders go first.
+  const lead = new Set(knownTeams.map(t => leaderOf(t)).filter(Boolean));
+  return [...picked.filter(s => lead.has(s)), ...picked.filter(s => !lead.has(s))]
+    .map(spec => ({ spec, count: cnt[spec], team: teamOf[spec] || null }));
 }
 
 function toToml(config, bots) {
   const val = (v) => typeof v === 'string' ? JSON.stringify(v) : typeof v === 'boolean' ? String(v) : String(v);
   const lines = ['# Terrabots battle file: terrabots-battle this.toml'];
   for (const [k, v] of Object.entries(config)) lines.push(v === null ? `# ${k} = (unset)` : `${k} = ${val(v)}`);
-  for (const b of bots) lines.push('', '[[bots]]', `spec = ${JSON.stringify(b.spec)}`, `count = ${b.count}`);
+  for (const b of bots.filter(b => !b.team)) lines.push('', '[[bots]]', `spec = ${JSON.stringify(b.spec)}`, `count = ${b.count}`);
+  for (const team of [...new Set(bots.filter(b => b.team).map(b => b.team))]) {
+    lines.push('', '[[teams]]', `name = ${JSON.stringify(team)}`);
+    for (const b of bots.filter(b => b.team === team)) lines.push('[[teams.members]]', `spec = ${JSON.stringify(b.spec)}`, `count = ${b.count}`);
+  }
   return lines.join('\n') + '\n';
 }
 
@@ -814,7 +888,11 @@ function readable(c) {   // labels and swatches must stay visible on the dark UI
 
 function makeTank(bot) {
   const own = bot.colors || {};
-  const base = botColor(bot.id);
+  // In team battles members share their team's hue, a little lighter or darker each.
+  const mates = bot.team ? (battleBots || []).filter(b => b.team === bot.team) : [];
+  const base = bot.team
+    ? new THREE.Color(teamColor(bot.team)).offsetHSL(0, 0, ((mates.findIndex(b => b.id === bot.id) % 3) - 1) * 0.09)
+    : botColor(bot.id);
   const color = cssColor(own.body, base);
   const dark = cssColor(own.gun, color.clone().multiplyScalar(0.55));
   const dish = cssColor(own.radar, new THREE.Color(0xe8eef8));
@@ -852,7 +930,8 @@ function makeTank(bot) {
   scene.add(root);
 
   const tag = document.createElement('div'); tag.className = 'tag';
-  tag.innerHTML = `<div class="n" style="color:#${accent.getHexString()}">${bot.name}</div><div class="bar"><i></i></div><div class="bar heat"><i></i></div>`;
+  const teamLine = bot.team ? `<div class="tm" style="color:${teamColor(bot.team)}">${bot.team}${bot.leader ? ' ★' : ''}</div>` : '';
+  tag.innerHTML = `${teamLine}<div class="n" style="color:#${accent.getHexString()}">${bot.name}</div><div class="bar"><i></i></div><div class="bar heat"><i></i></div>`;
   $('labels').appendChild(tag);
   return { id: bot.id, name: bot.name, root, hull, turret, radar, color: accent, tag, wedges: [], state: 'alive', data: null,
            scanColor: cssColor(own.scan, accent), bulletColor: cssColor(own.bullet, null) };
@@ -984,7 +1063,7 @@ function updateTanks(frame) {
     t.hull.rotation.y = headingRad(bot.heading);
     t.turret.rotation.y = headingRad(bot.gun);
     t.radar.rotation.y = headingRad(bot.radar);
-    const fr = Math.max(0, Math.min(1, bot.energy / (battleConfig?.initial_energy || 100)));
+    const fr = Math.max(0, Math.min(1, bot.energy / startEnergy(bot.id)));
     const bar = t.tag.querySelector('.bar > i');
     bar.style.width = `${fr * 100}%`;
     bar.style.background = `hsl(${fr * 120}, 70%, 50%)`;
@@ -1253,9 +1332,31 @@ function renderScoreboard(frame, force = false) {
   lastBoardDraw = now;
   const rows = frame.bots.map(b => ({ ...b, total: frame.totals?.[b.id] ?? 0 }))
     .sort((a, b) => (a.state === 'dead') - (b.state === 'dead') || b.total - a.total);
-  $('sb-rows').innerHTML = rows.map(b => {
+  const teamOfBot = new Map((battleBots || []).map(b => [b.id, b.team]));
+  if ([...teamOfBot.values()].some(Boolean)) {
+    // Team battle: one block per team (solo bots are blocks of one), best total first.
+    const blocks = new Map();
+    for (const b of rows) {
+      const key = teamOfBot.get(b.id) || `solo:${b.id}`;
+      if (!blocks.has(key)) blocks.set(key, []);
+      blocks.get(key).push(b);
+    }
+    const sum = (bs) => bs.reduce((a, b) => a + b.total, 0);
+    $('sb-rows').innerHTML = [...blocks.entries()].sort((a, b) => sum(b[1]) - sum(a[1])).map(([key, bs]) =>
+      (key.startsWith('solo:') ? '' : `<div class="sb-team${bs.every(b => b.state === 'dead') ? ' out' : ''}"><span class="sw" style="background:${teamColor(key)}"></span>${key}<span class="num">${Math.round(sum(bs))}</span></div>`)
+      + bs.map(sbRow).join('')).join('');
+    return;
+  }
+  $('sb-rows').innerHTML = rows.map(sbRow).join('');
+}
+// Leaders and droids start with more energy; bars show energy against each bot's own start.
+function startEnergy(id) {
+  const c = battleConfig || {}, b = (battleBots || []).find(x => x.id === id) || {};
+  return (c.initial_energy || 100) + (b.leader ? c.team_leader_bonus || 0 : 0) + (b.droid ? c.droid_bonus || 0 : 0);
+}
+function sbRow(b) {
     const c = tanks.get(b.id)?.color.getHexString() || 'fff';
-    const fr = Math.max(0, Math.min(1, b.energy / (battleConfig?.initial_energy || 100)));
+    const fr = Math.max(0, Math.min(1, b.energy / startEnergy(b.id)));
     const on = radarShown(b.id);
     return `<div class="sb-row${b.state === 'dead' ? ' dead' : ''}${followId === b.id ? ' followed' : ''}" data-id="${b.id}">
       <button class="rd${on ? ' on' : ''}" data-radar="${b.id}" title="Radar wedge ${on ? 'shown' : 'hidden'}. Click: toggle · Shift+click: only this one" aria-label="Toggle radar of ${b.name}" aria-pressed="${on}">
@@ -1263,7 +1364,6 @@ function renderScoreboard(frame, force = false) {
       <span class="sw" style="background:#${c}"></span><span class="nm" title="${b.name}">${b.name}</span>
       <span class="bar"><i style="width:${fr * 100}%;background:hsl(${fr * 120},70%,50%)"></i></span>
       <span class="sc num">${Math.round(b.total)}</span></div>`;
-  }).join('');
 }
 // pointerdown, not click: rows are redrawn while a battle runs, and a click whose
 // press and release land on different (redrawn) elements never fires.
@@ -1392,9 +1492,17 @@ function showSurvivalResults(msg) {
 function showResults(msg) {
   $('results-title').textContent = 'Battle results';
   const fmt = (k, v) => k === 'hit_rate' ? `${(v * 100).toFixed(1)}%` : typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(1) : v;
+  const teams = msg.teams || [];
+  const cols = teams.length ? [RESULT_COLS[0], RESULT_COLS[1], ['team', 'Team'], ...RESULT_COLS.slice(2)] : RESULT_COLS;
+  $('results-teams').classList.toggle('hidden', !teams.length);
+  $('results-teams').innerHTML = teams.length
+    ? `<thead><tr><th>#</th><th>Team</th><th>Total</th><th>1st</th><th>2nd</th><th>3rd</th><th style="text-align:left">Members</th></tr></thead><tbody>` +
+      teams.map(t => `<tr><td class="num">${t.rank}</td><td><span class="team-dot" style="background:${teamColor(t.name)};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${t.name}</td>` +
+        `<td class="num">${t.total.toFixed(1)}</td><td class="num">${t.firsts}</td><td class="num">${t.seconds}</td><td class="num">${t.thirds}</td><td style="text-align:left">${t.members.join(', ')}</td></tr>`).join('') + '</tbody>'
+    : '';
   $('results-table').innerHTML =
-    `<thead><tr>${RESULT_COLS.map(([, h]) => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
-    msg.results.map(r => `<tr>${RESULT_COLS.map(([k]) => `<td class="${k === 'name' ? '' : 'num'}">${fmt(k, r[k])}</td>`).join('')}</tr>`).join('') +
+    `<thead><tr>${cols.map(([, h]) => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
+    msg.results.map(r => `<tr>${cols.map(([k]) => `<td class="${k === 'name' || k === 'team' ? '' : 'num'}">${k === 'team' ? (r.team || '—') : fmt(k, r[k])}</td>`).join('')}</tr>`).join('') +
     '</tbody>';
   const c = msg.config;
   $('results-sub').textContent = `${c.rounds} rounds · ${c.terrain === 'map' ? 'map ' + c.map : `${c.width}×${c.height} ${c.terrain}`} · seed ${c.seed ?? 'random'} · energy return: ${c.hit_energy_return}`;
@@ -1674,6 +1782,7 @@ function connect() {
         $('hud').classList.remove('hidden'); $('scoreboard').classList.remove('hidden');
         const firstRound = msg.round === 1 || !terrainMesh;
         battleConfig = msg.config; battleBots = msg.bots;
+        for (const t of msg.teams || []) if (!knownTeams.includes(t)) knownTeams.push(t);
         clearBattle();
         buildTerrain(msg.world);
         for (const b of msg.bots) tanks.set(b.id, makeTank(b));
@@ -1694,9 +1803,9 @@ function connect() {
         $('h-inactive').classList.toggle('hidden', !msg.inactive);
         break;
       case 'round_end': {
-        const top = msg.ranking[0];
-        const head = msg.survivors === 1 ? `Round ${msg.round}: ${top.name} wins`
-                                         : `Round ${msg.round}: time limit, ${top.name} leads`;
+        const top = msg.ranking[0], who = top.team || top.name;
+        const head = (msg.teams_left ?? msg.survivors) === 1 ? `Round ${msg.round}: ${who} wins`
+                                                             : `Round ${msg.round}: time limit, ${who} leads`;
         banner(`${head} <small>${msg.round < msg.rounds ? 'next round starting…' : 'battle over'}</small>`, 1500);
         break;
       }

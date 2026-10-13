@@ -75,7 +75,7 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
     except Exception:
         conn.send(("error", traceback.format_exc()))
         return
-    conn.send(("ready", cls.__name__))
+    conn.send(("ready", cls.__name__, bool(cls.droid)))
     memory: dict[str, Any] = {}
     from terrabots.battle.runner import storage_key
     from terrabots.battle.storage import BotStorage
@@ -91,9 +91,10 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
         kind = msg[0]
         try:
             if kind == "round":
-                _, bot_id, name, rules, round_number, rounds, console = msg
+                _, bot_id, name, rules, round_number, rounds, console, team = msg
                 agent = cls()
                 agent.bot_id, agent.name, agent.memory, agent.rules = bot_id, name, memory, rules
+                agent.team, agent.teammates, agent.is_leader = team
                 agent.storage = storage
                 agent.on_round_start(round_number, rounds)
                 conn.send(("ok", agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn,
@@ -110,7 +111,8 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
                 if not isinstance(action, BattleAction):
                     raise TypeError(f"decide() returned {type(action).__name__}, expected BattleAction")
                 conn.send(("action", seq, action, agent.draw.shapes, elapsed_ms,
-                           agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn, lines))
+                           agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn, lines,
+                           agent.take_outbox()))
             elif kind == "death":
                 if agent is not None:
                     agent.on_death()
@@ -153,6 +155,7 @@ class ProcessBot(BattleAgent):
         self.last_elapsed_ms = 0.0
         self.console = False          # capture prints/logs (set by the runner)
         self.last_console: list[str] = []
+        self.droid = False            # the bot class's, known once it has loaded
 
     @property
     def is_dead(self) -> bool:
@@ -163,12 +166,13 @@ class ProcessBot(BattleAgent):
         if reply[0] != "ready":
             self.close()
             raise BotProcessError(f"{self.spec} failed to load:\n{reply[1]}")
-        self.class_name = reply[1]
+        self.class_name, self.droid = reply[1], reply[2]
 
     # --- lifecycle hooks -------------------------------------------------
 
     def on_round_start(self, round_number: int, rounds: int) -> None:
-        self._send(("round", self.bot_id, self.name, self.rules, round_number, rounds, self.console))
+        self._send(("round", self.bot_id, self.name, self.rules, round_number, rounds, self.console,
+                    (self.team, self.teammates, self.is_leader)))
         reply = self._recv(START_TIMEOUT_S, "on_round_start")
         if reply[0] != "ok":
             raise BotProcessError(f"{self.name} failed in on_round_start:\n{reply[1]}")
@@ -202,8 +206,9 @@ class ProcessBot(BattleAgent):
                 continue  # stale answer from a turn we already gave up on
             if reply[0] == "decide_error":
                 raise BotProcessError(reply[2])
-            _, _, action, shapes, self.last_elapsed_ms, adj_gun, adj_radar, self.last_console = reply
+            _, _, action, shapes, self.last_elapsed_ms, adj_gun, adj_radar, self.last_console, outbox = reply
             self.draw.shapes = shapes
+            self._outbox = outbox
             self.adjust_gun_for_body_turn, self.adjust_radar_for_gun_turn = adj_gun, adj_radar
             return action
 

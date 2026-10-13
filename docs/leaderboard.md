@@ -8,15 +8,16 @@ Every pair, maps flat, twin-hills, ridge, fortress, 2 seeds x 10 rounds. APS = a
 
 | # | Bot | APS | Rounds won | From |
 |---|---|---|---|---|
-| 1 | Learner | 76.3 | 75.8 % | demo |
-| 2 | Crazy | 74.3 | 73.1 % | demo |
-| 3 | SpinBot | 64.3 | 60.5 % | demo |
-| 4 | FirstTank | 59.7 | 64.4 % | template |
-| 5 | Corners | 47.4 | 44.4 % | demo |
-| 6 | Tracker | 47.4 | 50.6 % | demo |
-| 7 | RamFire | 39.7 | 27.7 % | demo |
-| 8 | Walls | 31.8 | 24.5 % | demo |
-| 9 | SittingDuck | 9.1 | 29.1 % | demo |
+| 1 | Learner | 74.9 | 75.7 % | demo |
+| 2 | Crazy | 73.1 | 72.6 % | demo |
+| 3 | SquadLeader | 68.1 | 68.2 % | demo |
+| 4 | SpinBot | 62.5 | 59.3 % | demo |
+| 5 | FirstTank | 58.0 | 62.9 % | template |
+| 6 | Tracker | 44.8 | 46.8 % | demo |
+| 7 | Corners | 43.0 | 39.7 % | demo |
+| 8 | RamFire | 38.2 | 25.1 % | demo |
+| 9 | Walls | 29.3 | 22.6 % | demo |
+| 10 | SittingDuck | 8.2 | 26.9 % | demo |
 
 ## Melee
 
@@ -24,15 +25,16 @@ All bots together, maps flat, lakes, fortress, canyon, procedural, 2 seeds x 10 
 
 | # | Bot | Share | Rounds won | From |
 |---|---|---|---|---|
-| 1 | Crazy | 168.4 % | 23.0 % | demo |
-| 2 | FirstTank | 150.5 % | 37.0 % | template |
-| 3 | Learner | 133.1 % | 22.0 % | demo |
-| 4 | SpinBot | 113.7 % | 8.0 % | demo |
-| 5 | Corners | 101.3 % | 6.0 % | demo |
-| 6 | Tracker | 83.0 % | 1.0 % | demo |
-| 7 | Walls | 68.6 % | 0.0 % | demo |
-| 8 | SittingDuck | 42.4 % | 3.0 % | demo |
-| 9 | RamFire | 39.0 % | 0.0 % | demo |
+| 1 | Crazy | 176.2 % | 31.0 % | demo |
+| 2 | FirstTank | 139.0 % | 27.0 % | template |
+| 3 | SquadLeader | 137.3 % | 9.0 % | demo |
+| 4 | Learner | 114.0 % | 15.0 % | demo |
+| 5 | SpinBot | 109.0 % | 10.0 % | demo |
+| 6 | Corners | 88.2 % | 3.0 % | demo |
+| 7 | Tracker | 83.1 % | 2.0 % | demo |
+| 8 | Walls | 75.5 % | 1.0 % | demo |
+| 9 | SittingDuck | 44.7 % | 2.0 % | demo |
+| 10 | RamFire | 33.2 % | 0.0 % | demo |
 
 ## Survival
 

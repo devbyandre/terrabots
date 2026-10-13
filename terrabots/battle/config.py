@@ -13,6 +13,16 @@ A battle file holds the config fields at top level plus the bots to fight:
     [[bots]]
     spec = "terrabots.agents.tracker:Tracker"
     count = 2
+
+and, for team battles, teams (the first member is the leader):
+
+    [[teams]]
+    name = "Red"
+    [[teams.members]]
+    spec = "terrabots.agents.squad:SquadLeader"
+    [[teams.members]]
+    spec = "terrabots.agents.squad:SquadDroid"
+    count = 2
 """
 
 from __future__ import annotations
@@ -63,7 +73,12 @@ _RANGES: dict[str, tuple[float | None, float | None]] = {
     "ram_damage": (0, None),
     "decide_time_budget_ms": (0, None),
     "bot_storage_quota_kb": (0, 10240),
+    "team_leader_bonus": (0, None),
+    "droid_bonus": (0, None),
+    "team_message_range": (1, 1000),
 }
+MAX_TEAMS = 8
+MAX_TEAM_NAME = 24
 
 
 class BattleConfigError(ValueError):
@@ -74,6 +89,13 @@ class BattleConfigError(ValueError):
 class BotEntry:
     spec: str          # "package.module:ClassName", as for terrabots-run --agent
     count: int = 1
+
+
+@dataclass
+class TeamEntry:
+    """A team: its bots fight together. The first member is the team leader."""
+    name: str
+    members: list[BotEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -126,6 +148,13 @@ class BattleConfig:
     # --- Stalemates ---
     inactivity_time: int = 450               # ticks without damage before the drain starts
     inactivity_energy_drain: float = 0.1     # energy every bot loses per tick while inactive
+
+    # --- Teams (Robocode: leader 200 energy, droid 120 and no radar) ---
+    team_leader_bonus: float = 100.0         # extra start energy for a team's first member
+    droid_bonus: float = 20.0                # extra start energy for droids (no radar)
+    team_message_range: float | None = None  # None = teammates hear each other anywhere
+                                             # (Robocode); a number = only within that many
+                                             # cells and in line of sight, like shouting
 
     # --- Mode ---
     comms_enabled: bool = True
@@ -223,21 +252,23 @@ class BattleConfig:
 class BattleFile:
     """A parsed battle TOML: settings plus the bots that fight."""
     config: BattleConfig
-    bots: list[BotEntry] = field(default_factory=list)
+    bots: list[BotEntry] = field(default_factory=list)     # each fights for itself
+    teams: list[TeamEntry] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BattleFile":
         data = dict(data)
-        raw_bots = data.pop("bots", [])
-        bots: list[BotEntry] = []
-        for i, b in enumerate(raw_bots):
-            if not isinstance(b, dict) or "spec" not in b:
-                raise BattleConfigError(f"bots[{i}]: needs a 'spec' like 'module:Class'")
-            count = b.get("count", 1)
-            if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-                raise BattleConfigError(f"bots[{i}].count: expected a positive integer")
-            bots.append(BotEntry(spec=str(b["spec"]), count=count))
-        return cls(config=BattleConfig.from_dict(data), bots=bots)
+        bots = _bot_entries(data.pop("bots", []), "bots")
+        raw_teams = data.pop("teams", [])
+        if not isinstance(raw_teams, list):
+            raise BattleConfigError("teams: expected a list of [[teams]] tables")
+        teams = []
+        for i, t in enumerate(raw_teams):
+            if not isinstance(t, dict):
+                raise BattleConfigError(f"teams[{i}]: expected a table with name and members")
+            teams.append(TeamEntry(str(t.get("name", "")), _bot_entries(t.get("members", []), f"teams[{i}].members")))
+        validate_teams(teams)
+        return cls(config=BattleConfig.from_dict(data), bots=bots, teams=teams)
 
     @classmethod
     def load(cls, path: str | Path) -> "BattleFile":
@@ -254,7 +285,40 @@ class BattleFile:
                 lines.append(f"{key} = {_toml_value(value)}")
         for b in self.bots:
             lines += ["", "[[bots]]", f"spec = {_toml_value(b.spec)}", f"count = {b.count}"]
+        for t in self.teams:
+            lines += ["", "[[teams]]", f"name = {_toml_value(t.name)}"]
+            for b in t.members:
+                lines += ["[[teams.members]]", f"spec = {_toml_value(b.spec)}", f"count = {b.count}"]
         return "\n".join(lines) + "\n"
+
+
+def _bot_entries(raw: Any, where: str) -> list[BotEntry]:
+    if not isinstance(raw, list):
+        raise BattleConfigError(f"{where}: expected a list")
+    out = []
+    for i, b in enumerate(raw):
+        if not isinstance(b, dict) or "spec" not in b:
+            raise BattleConfigError(f"{where}[{i}]: needs a 'spec' like 'module:Class'")
+        count = b.get("count", 1)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise BattleConfigError(f"{where}[{i}].count: expected a positive integer")
+        out.append(BotEntry(spec=str(b["spec"]), count=count))
+    return out
+
+
+def validate_teams(teams: list[TeamEntry]) -> None:
+    if len(teams) > MAX_TEAMS:
+        raise BattleConfigError(f"teams: at most {MAX_TEAMS} teams")
+    seen = set()
+    for i, t in enumerate(teams):
+        name = t.name.strip()
+        if not name or len(name) > MAX_TEAM_NAME:
+            raise BattleConfigError(f"teams[{i}].name: 1 to {MAX_TEAM_NAME} characters")
+        if name in seen:
+            raise BattleConfigError(f"teams[{i}].name: {name!r} is used twice")
+        seen.add(name)
+        if not t.members:
+            raise BattleConfigError(f"teams[{i}] ({name}): needs at least one member")
 
 
 def _toml_value(value: Any) -> str:

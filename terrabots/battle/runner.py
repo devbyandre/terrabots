@@ -5,6 +5,12 @@ BattleRunner: a battle of several rounds, with summed scores and a results table
     results = runner.run()
     print(results.table())
 
+Team battles: pass teams as TeamEntry (name + members) or (name, [(cls, count)]):
+
+    BattleRunner(config, [(Crazy, 1)], teams=[("Red", [(SquadLeader, 1), (SquadDroid, 2)])])
+
+The first member of a team is its leader. Bots in `bots` fight alone.
+
 For step-by-step control (the viewer pauses and single-steps), drive it manually:
 
     while not runner.done:
@@ -36,7 +42,7 @@ from typing import Any, Callable
 from terrabots import map_generator
 from terrabots.battle.agent import BattleAgent
 from terrabots.battle.arena import Arena
-from terrabots.battle.config import BattleConfig, BotEntry
+from terrabots.battle.config import BattleConfig, BotEntry, TeamEntry, validate_teams
 from terrabots.battle.isolation import ProcessBot, spec_of, start_bots
 from terrabots.battle.storage import BotStorage
 from terrabots.console import is_users_bot
@@ -50,7 +56,7 @@ from terrabots.world_terrain import WorldGrid
 
 RESULT_COLUMNS = ["rank", "name", "total", "survival", "last_survivor", "bullet_damage",
                   "bullet_kill_bonus", "ram_damage", "ram_kill_bonus", "firsts", "seconds",
-                  "thirds", "shots", "hits", "hit_rate", "avg_end_energy", "skipped_turns"]
+                  "thirds", "shots", "hits", "hit_rate", "avg_end_energy", "skipped_turns", "team"]
 
 
 def load_bot_class(spec: str) -> type[BattleAgent]:
@@ -84,10 +90,13 @@ class BattleResults:
     config: dict[str, Any]
     rows: list[dict[str, Any]]                       # sorted by total, rank 1 first
     rounds: list[dict[str, Any]] = field(default_factory=list)  # per-round rankings
+    teams: list[dict[str, Any]] = field(default_factory=list)   # team battles: sorted team totals
 
     def to_json(self) -> str:
-        return json.dumps({"config": self.config, "results": self.rows, "rounds": self.rounds},
-                          indent=2)
+        data = {"config": self.config, "results": self.rows, "rounds": self.rounds}
+        if self.teams:
+            data["teams"] = self.teams
+        return json.dumps(data, indent=2)
 
     def to_csv(self) -> str:
         out = io.StringIO()
@@ -106,6 +115,17 @@ class BattleResults:
         return path
 
     def table(self) -> str:
+        bots = self._bot_table()
+        if not self.teams:
+            return bots
+        head = f"{'rank':>4}  {'team':<22}  {'total':>8}  {'1st':>4}  {'2nd':>4}  {'3rd':>4}  members"
+        lines = [head, "-" * len(head)]
+        for t in self.teams:
+            lines.append(f"{t['rank']:>4}  {t['name']:<22}  {t['total']:>8.0f}  {t['firsts']:>4}  "
+                         f"{t['seconds']:>4}  {t['thirds']:>4}  {', '.join(t['members'])}")
+        return "\n".join(lines) + "\n\n" + bots
+
+    def _bot_table(self) -> str:
         cols = [("rank", 4), ("name", 22), ("total", 8), ("survival", 8), ("bullet_damage", 8),
                 ("ram_damage", 6), ("firsts", 4), ("seconds", 4), ("thirds", 4), ("hit_rate", 6)]
         heads = {"bullet_damage": "bullet", "ram_damage": "ram", "firsts": "1st",
@@ -133,14 +153,27 @@ class BattleRunner:
                  bots: list[tuple[type[BattleAgent], int]] | list[BotEntry],
                  time_budget_ms: float | None | str = "config",
                  on_round_start: Callable[[Arena], None] | None = None,
-                 data_dir: str | None = None, console: bool = False) -> None:
+                 data_dir: str | None = None, console: bool = False,
+                 teams: list[TeamEntry] | list[tuple[str, list]] | None = None) -> None:
         self.config = config
         self.console = console      # capture the user's bots' prints/logs for the viewer
         self.data_dir = data_dir    # bot storage root; None = in memory only
-        self.entries: list[tuple[type[BattleAgent], int]] = [
-            (load_bot_class(b.spec), b.count) if isinstance(b, BotEntry) else b for b in bots
-        ]
-        if sum(n for _, n in self.entries) < 2:
+
+        def resolve(b: Any) -> tuple[type[BattleAgent], int]:
+            return (load_bot_class(b.spec), b.count) if isinstance(b, BotEntry) else b
+
+        team_entries = [t if isinstance(t, TeamEntry) else TeamEntry(t[0], list(t[1])) for t in teams or []]
+        validate_teams(team_entries)
+        # (class, count, team name or None), solo bots first
+        groups = [(*resolve(b), None) for b in bots]
+        groups += [(*resolve(m), t.name.strip()) for t in team_entries for m in t.members]
+        self.entries: list[tuple[type[BattleAgent], int]] = []
+        for cls, count, _ in groups:     # one entry per class, for memory and storage
+            if cls not in [c for c, _ in self.entries]:
+                self.entries.append((cls, 0))
+            i = [c for c, _ in self.entries].index(cls)
+            self.entries[i] = (cls, self.entries[i][1] + count)
+        if sum(count for _, count, _ in groups) < 2:
             raise ValueError("A battle needs at least two bots")
 
         # A debugger stepping through decide() would blow every time budget.
@@ -158,10 +191,24 @@ class BattleRunner:
         self.arena_finished = True
         self.on_round_start = on_round_start
 
+        # Names are numbered when a class appears more than once in the battle.
+        totals_per_class = dict(self.entries)
+        seen: dict[type, int] = {}
         self.names: list[tuple[type[BattleAgent], str]] = []
-        for cls, count in self.entries:
-            for i in range(count):
-                self.names.append((cls, f"{cls.__name__} ({i + 1})" if count > 1 else cls.__name__))
+        self.team_of: list[str | None] = []          # per bot id
+        for cls, count, team in groups:
+            for _ in range(count):
+                seen[cls] = seen.get(cls, 0) + 1
+                many = totals_per_class[cls] > 1
+                self.names.append((cls, f"{cls.__name__} ({seen[cls]})" if many else cls.__name__))
+                self.team_of.append(team)
+        members: dict[str, list[int]] = {}
+        for bid, team in enumerate(self.team_of):
+            if team is not None:
+                members.setdefault(team, []).append(bid)
+        self.teams = members                          # team name -> bot ids, leader first
+        self.leaders = {ids[0] for ids in members.values() if len(ids) > 1}
+        self.team_places: dict[str, list[int]] = {t: [0, 0, 0] for t in members}
         self.totals: dict[int, BotScore] = {
             bid: BotScore(name, cls.__name__) for bid, (cls, name) in enumerate(self.names)
         }
@@ -199,6 +246,9 @@ class BattleRunner:
             agent = self.processes[bid] if self.processes else cls()
             agent.bot_id, agent.name = bid, name
             agent.rules = dataclasses.replace(self.config)
+            agent.team = self.team_of[bid]
+            agent.teammates = {o: self.names[o][1] for o in self.teams.get(agent.team, []) if o != bid}
+            agent.is_leader = bid in self.leaders
             if not self.processes:
                 agent.memory = self.memory[cls]
                 agent.storage = self.storages[cls]
@@ -230,7 +280,10 @@ class BattleRunner:
         ranking = self.arena.finish()
         for bid, score in self.arena.scorer.scores.items():
             self.totals[bid].add(score)
-        rows = [{"place": i + 1, "id": bid, "name": self.names[bid][1],
+        for place, team in enumerate(self.arena.scorer.team_ranking[:3]):
+            if team in self.team_places:
+                self.team_places[team][place] += 1
+        rows = [{"place": i + 1, "id": bid, "name": self.names[bid][1], "team": self.team_of[bid],
                  "score": round(self.arena.scorer.scores[bid].total, 1)}
                 for i, bid in enumerate(ranking)]
         self.round_rankings.append({"round": self.round, "ticks": self.arena.tick, "ranking": rows})
@@ -238,13 +291,37 @@ class BattleRunner:
         return rows
 
     def results(self) -> BattleResults:
-        ordered = sorted(self.totals.values(), key=lambda s: -s.total)
+        ordered = sorted(self.totals.items(), key=lambda kv: -kv[1].total)
         rows = []
-        for rank, s in enumerate(ordered, start=1):
+        for rank, (bid, s) in enumerate(ordered, start=1):
             d = s.to_dict()
             d["rank"] = rank
+            d["team"] = self.team_of[bid]
             rows.append(d)
-        return BattleResults(self.config.to_dict(), rows, self.round_rankings)
+        return BattleResults(self.config.to_dict(), rows, self.round_rankings, self._team_rows())
+
+    def _team_rows(self) -> list[dict[str, Any]]:
+        """Team totals (sums of the members' scores); solo bots count as one-bot teams."""
+        if not self.teams:
+            return []
+        groups = [(team, ids) for team, ids in self.teams.items()]
+        groups += [(self.names[bid][1], [bid]) for bid, t in enumerate(self.team_of) if t is None]
+        out = []
+        for name, ids in groups:
+            total = BotScore(name, "")
+            for bid in ids:
+                total.add(self.totals[bid])
+            places = self.team_places.get(name)
+            if places is None:     # a solo bot: its own places are its team's
+                places = [total.firsts, total.seconds, total.thirds]
+            out.append({"name": name, "members": [self.names[b][1] for b in ids],
+                        "total": round(total.total, 2), "survival": round(total.survival, 2),
+                        "bullet_damage": round(total.bullet_damage, 2), "ram_damage": round(total.ram_damage, 2),
+                        "firsts": places[0], "seconds": places[1], "thirds": places[2]})
+        out.sort(key=lambda r: -r["total"])
+        for rank, r in enumerate(out, start=1):
+            r["rank"] = rank
+        return out
 
     def run(self, verbose: bool = False) -> BattleResults:
         try:
@@ -260,7 +337,8 @@ class BattleRunner:
             ranking = self.end_round()
             if verbose:
                 standing = len(arena.standing())
-                outcome = (f"winner {ranking[0]['name']}" if standing == 1 else
-                           f"time limit, {standing} left, leader {ranking[0]['name']}")
+                first = ranking[0]["team"] or ranking[0]["name"]
+                outcome = (f"winner {first}" if len(arena.teams_standing()) == 1 else
+                           f"time limit, {standing} left, leader {first}")
                 print(f"Round {self.round}/{self.config.rounds}: {arena.tick} ticks, {outcome}")
         return self.results()

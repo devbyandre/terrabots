@@ -24,6 +24,15 @@ class ScannedBot:
     velocity: float
     energy: float
     elevation: float     # ground height under it
+    teammate: bool = False   # on your team (team battles); Robocode's isTeammate()
+
+
+@dataclass(frozen=True)
+class TeamMessage:
+    """A message from a teammate, sent with broadcast() or send() last tick."""
+    sender_id: int
+    sender_name: str
+    data: object         # plain data: dicts, lists, strings, numbers, bools, None
 
 
 @dataclass(frozen=True)

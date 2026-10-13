@@ -18,6 +18,7 @@ import os
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 from terrabots.battle.agent import BattleAgent
 
@@ -32,8 +33,9 @@ class BotInfo:
     name: str
     doc: str      # first line of the class docstring
     source: str   # "yours", "built-in" or "extra"
+    droid: bool = False   # battle bots: a Droid (no radar)
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -50,10 +52,11 @@ def _bots_in_module(module_name: str, source: str, base: type) -> list[BotInfo]:
         return []
     found = []
     for _, cls in inspect.getmembers(module, inspect.isclass):
-        if (issubclass(cls, base) and cls is not base
+        # _Names are helpers (shared base classes), not bots to pick.
+        if (issubclass(cls, base) and cls is not base and not cls.__name__.startswith("_")
                 and cls.__module__ == module_name and not inspect.isabstract(cls)):
             found.append(BotInfo(f"{module_name}:{cls.__name__}", cls.__name__,
-                                 _first_doc_line(cls), source))
+                                 _first_doc_line(cls), source, bool(getattr(cls, "droid", False))))
     return found
 
 
@@ -90,6 +93,7 @@ def discover_bots(extra_specs: list[str] | None = None,
             logger.warning("Skipping bot %s: %s", spec, exc)
             continue
         if isinstance(cls, type) and issubclass(cls, base):
-            bots.append(BotInfo(spec, class_name, _first_doc_line(cls), "extra"))
+            bots.append(BotInfo(spec, class_name, _first_doc_line(cls), "extra",
+                                bool(getattr(cls, "droid", False))))
             known.add(spec)
     return bots

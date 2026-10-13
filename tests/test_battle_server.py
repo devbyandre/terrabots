@@ -136,3 +136,43 @@ def test_map_builder_messages(tmp_path, monkeypatch) -> None:
     assert copy["map"]["name"] == "Ridge" and copy["warnings"] == []
     path = maps.save(new["map"])
     assert path.parent == tmp_path and any(m["id"] == path.stem and m["source"] == "yours" for m in maps.catalog())
+
+
+def test_websocket_team_battle() -> None:
+    """Bot rows with the same team name fight as a team; the first row leads."""
+    from websockets.asyncio.client import connect
+
+    async def scenario() -> tuple[dict, dict]:
+        bf = BattleFile.from_dict({"rounds": 1, "max_ticks_per_round": 40, "tick_delay_ms": 0,
+                                   "terrain": "flat", "seed": 1})
+        server = BattleServer(bf, port=8796, results_dir="/tmp/terrabots-test-results", time_budget_ms=None)
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0.3)
+        start = end = None
+        try:
+            async with connect("ws://localhost:8796/ws") as ws:
+                hello = json.loads(await ws.recv())
+                droid = next(b for b in hello["bots"] if b["spec"] == "terrabots.agents.squad:SquadDroid")
+                assert droid["droid"] is True
+                assert not any(b["name"].startswith("_") for b in hello["bots"])
+                await ws.send(json.dumps({"type": "start_battle", "config": bf.config.to_dict(), "bots": [
+                    {"spec": "terrabots.agents.squad:SquadLeader", "count": 1, "team": "Blue"},
+                    {"spec": "terrabots.agents.squad:SquadDroid", "count": 2, "team": "Blue"},
+                    {"spec": "terrabots.agents.spin_bot:SpinBot", "count": 1, "team": None}]}))
+                while end is None:
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+                    if msg["type"] == "round_start":
+                        start = msg
+                    elif msg["type"] == "battle_end":
+                        end = msg
+        finally:
+            task.cancel()
+        return start, end
+
+    start, end = asyncio.run(scenario())
+    by_name = {b["name"]: b for b in start["bots"]}
+    assert by_name["SquadLeader"]["leader"] and by_name["SquadLeader"]["team"] == "Blue"
+    assert by_name["SquadDroid (1)"]["droid"] and not by_name["SquadDroid (1)"]["leader"]
+    assert by_name["SpinBot"]["team"] is None
+    assert {t["name"] for t in end["teams"]} == {"Blue", "SpinBot"}
+    assert [b["team"] for b in end["bots"]] == [None, "Blue", "Blue"]

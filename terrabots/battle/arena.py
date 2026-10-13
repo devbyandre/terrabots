@@ -14,6 +14,12 @@ with all bots deciding on the same pre-tick state as in survival mode:
   7. Inactivity drain, deaths, scoring, comms delivery
 Events produced in steps 2-7 reach bots in the next tick's observation.
 
+Teams: each bot has a team (agent.team; None = alone). The round ends when only
+one team is standing. Friendly fire hurts but scores nothing (see scoring.py).
+Team messages (agent.broadcast/send) are collected after decide() and delivered
+with the comms in step 7, so they are read next tick; with team_message_range
+set they also need range and line of sight. Droids have no radar.
+
 decide() is timed. A turn that runs over decide_time_budget_ms, or raises, is
 skipped: the bot keeps its target speed but doesn't turn or fire (Robocode's
 "skipped turns"). Five consecutive exceptions and the bot is switched off for the
@@ -43,6 +49,7 @@ from terrabots.battle.events import (
     HitByBullet,
     HitWall,
     ScannedBot,
+    TeamMessage,
 )
 from terrabots.battle.geometry import clamp, distance, heading_to, normalize_heading
 from terrabots.battle.isolation import BotProcessError, ProcessBot
@@ -94,6 +101,7 @@ class _Slot:
         self.killed_by_ram = False
         self.drawings: list[dict[str, Any]] = []
         self.console: list[str] = []
+        self.team_inbox: list[TeamMessage] = []   # delivered last tick, read this tick
 
 
 def _empty_events() -> dict[str, list]:
@@ -117,20 +125,23 @@ class Arena:
         self._next_bullet_id = 0
         self._frame_events: list[dict[str, Any]] = []
         self._ticks_since_damage = 0
+        self._outgoing: list[tuple[int, int | None, object]] = []   # (sender, recipient, data)
 
         self.slots: dict[int, _Slot] = {}
         for agent in agents:
             x, y = self._spawn_point(agent, rng)
             heading = rng.uniform(0, 360)
+            energy = (config.initial_energy + (config.team_leader_bonus if agent.is_leader else 0.0)
+                      + (config.droid_bonus if agent.droid else 0.0))
             body = BattleBody(agent.bot_id, x, y, heading=heading, gun_heading=heading,
                               radar_heading=heading, radar_prev=heading,
-                              energy=config.initial_energy, gun_heat=config.initial_gun_heat)
+                              energy=energy, gun_heat=config.initial_gun_heat)
             scan_profile = dataclasses.replace(agent.profile, max_perception_range=config.radar_range)
             self.slots[agent.bot_id] = _Slot(agent, body, scan_profile)
 
-        self.scorer = RoundScorer({
-            bid: BotScore(s.agent.name, _class_name(s.agent)) for bid, s in self.slots.items()
-        })
+        self.scorer = RoundScorer(
+            {bid: BotScore(s.agent.name, _class_name(s.agent)) for bid, s in self.slots.items()},
+            teams={bid: s.agent.team for bid, s in self.slots.items() if s.agent.team is not None})
 
     # ------------------------------------------------------------------
     # Setup
@@ -158,9 +169,12 @@ class Arena:
         """Bots not destroyed (alive or disabled)."""
         return [s for s in self.slots.values() if s.body.state != DEAD]
 
+    def teams_standing(self) -> set:
+        return {self.scorer.team_of(s.body.bot_id) for s in self.standing()}
+
     @property
     def over(self) -> bool:
-        return len(self.standing()) <= 1 or self.tick >= self.cfg.max_ticks_per_round
+        return len(self.teams_standing()) <= 1 or self.tick >= self.cfg.max_ticks_per_round
 
     # ------------------------------------------------------------------
     # Tick
@@ -191,12 +205,14 @@ class Arena:
             self._move(s, actions[s.body.bot_id])
         for s in standing:
             if s.body.state == ALIVE:
-                self._radar_sweep(s)
+                if not s.agent.droid:
+                    self._radar_sweep(s)
                 if actions[s.body.bot_id].shout is not None:
                     self._shout(s, actions[s.body.bot_id])
         self._inactivity()
         self._resolve_deaths()
         self._comms.deliver()
+        self._deliver_team_messages()
         return self.frame()
 
     # ------------------------------------------------------------------
@@ -210,6 +226,7 @@ class Arena:
         """Ask every active bot for its action. Bots in their own process all get
         their observation first and think in parallel; then answers are collected."""
         active = [s for s in standing if s.body.state == ALIVE and not s.switched_off]
+        self._skipped_before = {s.body.bot_id: s.skipped_turns for s in active}
         for s in standing:
             s.drawings = []
             s.console = []
@@ -219,6 +236,14 @@ class Arena:
         actions = {s.body.bot_id: BattleAction() for s in standing}
         for s in active:
             actions[s.body.bot_id] = self._decide(s, remote=s in remote)
+        self._outgoing = []
+        for s in active:
+            # Messages of a skipped turn are dropped along with its action.
+            sent = s.agent.take_outbox()
+            if s.skipped_turns == self._skipped_before[s.body.bot_id]:
+                self._outgoing += [(s.body.bot_id, to, data) for to, data in sent]
+        for s in standing:
+            s.team_inbox = []
         return actions
 
     def _decide(self, s: _Slot, remote: bool = False) -> BattleAction:
@@ -273,6 +298,7 @@ class Arena:
             others=len(self.standing()) - 1,
             terrain=TerrainView(self.world, self._movement, s.agent.profile, b.x, b.y),
             inbox=self._comms.get_inbox(b.bot_id) if self.cfg.comms_enabled else [],
+            team_messages=list(s.team_inbox),
             skipped_turns=s.skipped_turns,
             **{k: list(v) for k, v in s.events.items()},
         )
@@ -369,7 +395,8 @@ class Arena:
             bullet.power, dmg))
         self.scorer.bullet_hit(bullet.shooter_id, target.body.bot_id, dealt)
         self._damage(target, dmg, attacker=bullet.shooter_id)
-        if shooter.body.state != DEAD:
+        friendly = self.scorer.friends(bullet.shooter_id, target.body.bot_id)
+        if shooter.body.state != DEAD and not friendly:
             shooter.body.energy += self.cfg.energy_return(bullet.power, dealt)
             if shooter.body.state == DISABLED and shooter.body.energy > 0:
                 shooter.body.state = ALIVE
@@ -468,7 +495,8 @@ class Arena:
                 bot_id=o.bot_id, name=other.agent.name, class_name=_class_name(other.agent),
                 bearing=heading_to(b.x, b.y, o.x, o.y), distance=distance(b.x, b.y, o.x, o.y),
                 heading=o.heading, velocity=o.velocity, energy=o.energy,
-                elevation=float(self.world.elevation_map[o.cell])))
+                elevation=float(self.world.elevation_map[o.cell]),
+                teammate=self.scorer.friends(b.bot_id, o.bot_id)))
             self._frame_events.append({"type": "scan", "bot": b.bot_id, "target": o.bot_id})
 
     def _shout(self, s: _Slot, a: BattleAction) -> None:
@@ -480,6 +508,23 @@ class Arena:
         self._comms.send(s.body.bot_id, s.body.cell, s.agent.profile,
                          target.body.bot_id, target.body.cell, MessageType.SIGNAL,
                          {"kind": a.shout.kind, **a.shout.payload})
+
+    def _deliver_team_messages(self) -> None:
+        rng = self.cfg.team_message_range
+        for sender_id, to, data in self._outgoing:
+            sender = self.slots[sender_id]
+            if sender.agent.team is None:
+                continue
+            for r in self.standing():
+                rid = r.body.bot_id
+                if not self.scorer.friends(sender_id, rid) or (to is not None and rid != to):
+                    continue
+                if rng is not None:
+                    profile = dataclasses.replace(sender.agent.profile, max_perception_range=rng)
+                    if not self._visibility.has_line_of_sight(sender.body.cell, r.body.cell, profile):
+                        continue
+                r.team_inbox.append(TeamMessage(sender_id, sender.agent.name, data))
+        self._outgoing = []
 
     def _resolve_deaths(self) -> None:
         newly_dead = [s for s in self.slots.values()
@@ -501,9 +546,10 @@ class Arena:
         survivors = sorted(((s.body.bot_id, s.body.energy) for s in self.standing()),
                            key=lambda p: -p[1])
         ranking = self.scorer.finish(survivors, len(self.slots))
-        winner = ranking[0] if len(survivors) == 1 else None
+        teams = self.teams_standing()
+        winner = next(iter(teams)) if len(teams) == 1 else None
         for s in self.slots.values():
-            s.agent.on_round_end(won=s.body.bot_id == winner)
+            s.agent.on_round_end(won=self.scorer.team_of(s.body.bot_id) == winner)
         return ranking
 
     def frame(self) -> dict[str, Any]:

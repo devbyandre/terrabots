@@ -51,9 +51,12 @@ MELEE_MAPS = [("flat", None), ("map", "lakes"), ("map", "fortress"), ("map", "ca
 
 def _classes(module_name: str, base: type) -> list[type]:
     module = importlib.import_module(module_name)
+    # Droids have no radar, so alone they can't see anyone: they belong in team
+    # battles, which this ladder doesn't run (yet). _Names are helper classes.
     return [c for _, c in inspect.getmembers(module, inspect.isclass)
             if issubclass(c, base) and c is not base and c.__module__ == module_name
-            and not inspect.isabstract(c)]
+            and not inspect.isabstract(c) and not c.__name__.startswith("_")
+            and not getattr(c, "droid", False)]
 
 
 def entrants() -> tuple[list[dict], list[dict]]:

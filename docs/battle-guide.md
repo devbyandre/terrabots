@@ -222,7 +222,48 @@ Strategies that follow:
 - **Wave shadows**: an enemy's bullet can't reach a point that terrain shields
   from its muzzle height, so those points are safe from that wave.
 
-## 8. Measuring what works
+## 8. Teams
+
+Robocode's team rules (from general knowledge of Robocode; the RoboWiki pages
+above don't cover them in detail):
+
+| What | Rule |
+|---|---|
+| Leader | the team's first member; starts with 200 energy (`team_leader_bonus` +100) |
+| Droid | `droid = True` on the class: 120 energy (`droid_bonus` +20), **no radar** |
+| Friendly fire | bullets and rams hurt teammates but score nothing and give no energy back |
+| Scans | teammates show up in `scanned_bots` with `teammate=True` |
+| Messages | `self.broadcast(data)` / `self.send(to, data)`; teammates read them next tick in `obs.team_messages` |
+| Message range | anywhere by default (Robocode); set `team_message_range` and they need range and line of sight, so hills cut the radio |
+| Round end | when only one team is left |
+| Scoring | survival points only for enemy deaths; last-survivor bonus to every standing member of the last team; places are team places; a team's score is the sum of its members' |
+
+Messages are plain data (dicts, lists, strings, numbers), at most 4 KB each and
+10 per tick. Ported Robocode team bots use `TeamRobot` (`broadcast_message`,
+`send_message`, `on_message_received`) and mix in `Droid`.
+
+Strategies, in the order teams usually learn them:
+
+- **Don't shoot each other.** Share your position every tick and hold fire when
+  a teammate is near the line of fire. Friendly fire is the first thing that
+  beats a new team: `Tracker` doesn't know about teams, and in
+  `battles/teams.toml` about a third of the Trackers' bullet damage (672 of
+  2175 over the 10 rounds) hits their own teammates. The team of three finishes
+  behind both bots that fight alone.
+- **Share what you see.** One radar can serve the whole team. In
+  [`squad.py`](../terrabots/agents/squad.py) the leader spins its radar and
+  broadcasts every enemy; its droids have no radar at all and still hit,
+  because they aim at the reports (with linear targeting from the report's age).
+- **Pick one target.** Two bots firing at the same enemy kill it in half the
+  time, and a dead enemy stops scoring and shooting. Let the leader name the
+  target.
+- **Spread out.** Enemy bullets aimed at one teammate hit the one standing next
+  to it; on terrain, a teammate on high ground can see (and report) what the
+  others can't.
+- **Protect the leader.** It has the most energy, and with droids on the team
+  it's also the only one that can see.
+
+## 9. Measuring what works
 
 Feelings lie; seeded battles don't.
 

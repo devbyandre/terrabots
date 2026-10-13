@@ -142,7 +142,8 @@ Further rules (Robocode-like):
 
 ## 7. Rounds, scoring, results
 
-Round ends when ≤ 1 bot remains (≤ 1 team later) or `max_ticks_per_round` is reached.
+Round ends when ≤ 1 team remains (a bot fighting alone is a team of one) or
+`max_ticks_per_round` is reached.
 Spawns are re-randomised each round (seeded). Bots are re-instantiated each round,
 but a per-battle `memory` dict on the class is preserved, the equivalent of Robocode
 static fields, so learning bots (GuessFactor stats) can carry data between rounds.
@@ -156,6 +157,14 @@ Scoring (Robocode-like, simplified):
 | Bullet damage | 1 per point of damage dealt |
 | Bullet kill bonus | 20 % of damage dealt to a bot you killed |
 | Ram damage | 2 per point; ram kill bonus 30 % |
+
+Teams (built): leader +100 start energy, droids +20 and no radar, friendly fire
+hurts but scores nothing (no energy back either), survival points only for enemy
+deaths, last-survivor bonus per standing member of the last team, team places.
+Team messages: `broadcast` / `send`, JSON data ≤ 4 KB, ≤ 10 per tick, delivered
+next tick; unlimited range unless `team_message_range` is set (then range + LOS).
+Battle files list teams as `[[teams]]` with `name` and `[[teams.members]]`; the
+first member is the leader. Results add a team table (sum of members' scores).
 
 Results table (per bot, sorted by total): rank, name, total score, survival, bullet
 damage, ram damage, 1st/2nd/3rd places, hit rate (hits / shots), average energy at
@@ -184,8 +193,8 @@ Defaults above let work start. Confirm or change before or during implementation
 2. `hit_energy_return` default `"damage"` (your rule) vs `"robocode"`.
 3. Radar-only perception of bots in battle mode (§5).
 4. Disabled-at-zero-energy rule (§4) vs instant death.
-5. Should battle mode also support teams in v1, or 1-vs-all only? *(default:
-   free-for-all only; teams later, since comms already exist)*
+5. Teams: built (§7), with Robocode's leader/droid rules, friendly fire without
+   points, and team messages of unlimited range by default.
 6. Scoring weights (§7).
 
 ## 10. Protocol changes (viewer ⇄ server)

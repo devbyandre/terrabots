@@ -74,7 +74,7 @@ def load_battle(args: argparse.Namespace) -> BattleFile:
         raise SystemExit(f"terrabots-battle: {exc}") from exc
     if args.bot:
         bf.bots = [_parse_bot(s) for s in args.bot]
-    if not bf.bots:
+    if not bf.bots and not bf.teams:
         bf.bots = list(DEFAULT_BOTS)
     return bf
 
@@ -89,10 +89,12 @@ def main(argv: list[str] | None = None) -> None:
         from terrabots.battle.runner import BattleRunner
 
         try:
-            runner = BattleRunner(bf.config, bf.bots, time_budget_ms=budget, data_dir=args.data_dir)
+            runner = BattleRunner(bf.config, bf.bots, time_budget_ms=budget, data_dir=args.data_dir,
+                                  teams=bf.teams)
         except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
             raise SystemExit(f"terrabots-battle: {exc}") from exc
-        print(f"Terrabots battle: {sum(b.count for b in bf.bots)} bots, {bf.config.rounds} rounds, "
+        n_bots = sum(b.count for b in bf.bots) + sum(m.count for t in bf.teams for m in t.members)
+        print(f"Terrabots battle: {n_bots} bots, {bf.config.rounds} rounds, "
               f"{bf.config.width}x{bf.config.height} {bf.config.terrain}, seed {bf.config.seed}")
         results = runner.run(verbose=True)
         print()

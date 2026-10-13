@@ -33,6 +33,11 @@ Differences to know about:
 - on_move_complete / on_turn_complete / on_gun_turn_complete /
   on_radar_turn_complete behave like Robocode's built-in custom conditions: they
   fire on every tick on which nothing of that kind is queued, not just once.
+
+Teams: TeamRobot adds broadcast_message / send_message / get_teammates /
+on_message_received; mix in Droid (class MyDroid(Droid, TeamRobot)) for a droid.
+Messages must be plain data (dicts, lists, strings, numbers), not Java-style
+Serializable objects.
 """
 
 from __future__ import annotations
@@ -120,6 +125,13 @@ class HitRobotEvent:
 @dataclass(frozen=True)
 class RobotDeathEvent:
     name: str
+
+
+@dataclass(frozen=True)
+class MessageEvent:
+    """A teammate's message (Robocode's MessageEvent)."""
+    sender: str
+    message: object
 
 
 # ---------------------------------------------------------------------------
@@ -369,6 +381,31 @@ class AdvancedRobot(BattleAgent):
                                      q.distance)
         return BattleAction(velocity=velocity, body_turn=q.body_turn, gun_turn=q.gun_turn,
                             radar_turn=q.radar_turn, fire=q.fire)
+
+
+class TeamRobot(AdvancedRobot):
+    """Robocode's TeamRobot: an AdvancedRobot that can talk to its teammates."""
+
+    def on_message_received(self, e: MessageEvent) -> None: ...
+
+    def broadcast_message(self, message: object) -> None:
+        self.broadcast(message)
+
+    def send_message(self, name: str, message: object) -> None:
+        self.send(name, message)
+
+    def get_teammates(self) -> list[str]:
+        return list(self.teammates.values())
+
+    def _dispatch(self, obs: BattleObservation) -> None:
+        for m in obs.team_messages:
+            self.on_message_received(MessageEvent(m.sender_name, m.data))
+        super()._dispatch(obs)
+
+
+class Droid:
+    """Mix-in for Robocode's Droid interface: extra energy, no radar."""
+    droid = True
 
 
 def _max_stoppable_speed(remaining: float, decel: float) -> float:

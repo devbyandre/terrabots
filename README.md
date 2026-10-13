@@ -223,6 +223,30 @@ open, is in [docs/arena-spec.md](docs/arena-spec.md).
 </tr>
 </table>
 
+## Teams
+
+Robocode-style team battles: bots on a team share a score, can talk
+(`self.broadcast(data)`, `self.send(name, data)`, read next tick in
+`obs.team_messages`) and see teammates marked in `scanned_bots`. The first
+member leads with 200 energy; `droid = True` makes a bot a droid with 120 energy
+and no radar. Friendly fire hurts but scores nothing. Teammates hear each other
+anywhere, or, with `team_message_range`, only within range and line of sight.
+
+```toml
+[[teams]]
+name = "Blue Squad"
+[[teams.members]]
+spec = "terrabots.agents.squad:SquadLeader"   # first = leader
+[[teams.members]]
+spec = "terrabots.agents.squad:SquadDroid"
+count = 2
+```
+
+`terrabots-battle battles/teams.toml` runs the demo squad against a team of
+Trackers and two bots that fight alone. In the setup screen, pick a team for
+each bot. The [battle guide](docs/battle-guide.md#8-teams) has the rules and
+team strategies.
+
 ## Use it from Python
 
 The [notebooks](notebooks/) are the hands-on version of this section: your first
@@ -274,6 +298,7 @@ the levels of the [survival guide](docs/survival-guide.md). Example agents:
 | `RamFire` | charges the nearest bot and rams it | keeping distance, ram scoring |
 | `Corners` | camps in the corner it survived best in, remembered across battles (`self.storage` example) | breaking a camper |
 | `Learner` | orbits with random reversals; guess-factor gun that learns per opponent across battles | your movement against a learning gun |
+| `SquadLeader` + `SquadDroid` | a team: the leader's radar reports every enemy, the droids (no radar) aim at the reports; nobody fires through a teammate | your team against a coordinated one |
 
 ## Leaderboard: submit your bot
 
@@ -284,9 +309,9 @@ a bot is added). Current top three:
 
 | 1v1 (APS) | Melee (share of points) | Survival (avg. lifetime) |
 |---|---|---|
-| 1. Learner 76.3 | 1. Crazy 168 % | 1. LevyForager 220 |
-| 2. Crazy 74.3 | 2. FirstTank 151 % | 2. Grazer 205 |
-| 3. SpinBot 64.3 | 3. Learner 133 % | 3. Sharer 171 |
+| 1. Learner 74.9 | 1. Crazy 176 % | 1. LevyForager 220 |
+| 2. Crazy 73.1 | 2. FirstTank 139 % | 2. Grazer 205 |
+| 3. SquadLeader 68.1 | 3. SquadLeader 137 % | 3. Sharer 171 |
 
 Full tables: [docs/leaderboard.md](docs/leaderboard.md). So far it's only the demo
 bots. **Put yours on the board:** add it as `contrib/<your-github-name>/<bot>.py`
@@ -318,7 +343,7 @@ tests/             pytest suite
 
 - [x] Survival mode, elevation-aware LOS, comms
 - [x] Battle mode: physics, radar, bullets, rounds, scoring, CLI, viewer
-- [ ] Teams (comms already exist) and team scoring
+- [x] Teams: leaders, droids, team messages, team scoring
 - [x] Bots in subprocesses for isolation and hard time limits
 - [x] Robocode-style AdvancedRobot API for porting Java bots
 - [x] Map files and a map editor

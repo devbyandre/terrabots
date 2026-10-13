@@ -9,7 +9,7 @@ Unlike the survival ViewerServer, viewers control the battle (start, pause, step
 speed, stop). There is one battle at a time; every connected viewer sees it and
 can control it.
 
-Client -> server: list_bots, start_battle {config, bots}, parse_toml {text},
+Client -> server: list_bots, start_battle {config, bots: [{spec, count, team?}]}, parse_toml {text},
                   start_survival {config, agents},
                   map_new {base, width, height, seed, id}, map_check {map}, map_save {map},
                   pause, resume, step, set_speed {tick_delay_ms}, set_pov {id}, stop_battle
@@ -17,6 +17,9 @@ Server -> client: hello {defaults, bots, survival}, bot_list, toml_parsed, error
                   round_start {world, ...}, tick, round_end, battle_end, stopped,
                   survival_start {world, agents, config}, survival_tick, survival_end,
                   map_data {map, warnings}, map_checked {warnings}, map_saved {id, warnings, maps}
+
+Teams travel as a `team` name on each bot entry: entries with the same name form
+a team, in order (the first is the leader); entries without one fight alone.
 """
 
 from __future__ import annotations
@@ -107,8 +110,7 @@ class BattleServer:
             shown = "localhost" if self.host in ("0.0.0.0", "::") else self.host  # all interfaces
             print(f"  Battle viewer: http://{shown}:{self.port}/")
             if self.autostart:
-                await self._start(self.defaults.config.to_dict(),
-                                  [{"spec": b.spec, "count": b.count} for b in self.defaults.bots])
+                await self._start(self.defaults.config.to_dict(), bot_list(self.defaults))
             await asyncio.Future()  # run until cancelled (Ctrl+C)
 
     def _process_request(self, connection: ServerConnection, request: Request) -> Response | None:
@@ -131,7 +133,7 @@ class BattleServer:
             await ws.send(json.dumps({
                 "type": "hello",
                 "defaults": {"config": self.defaults.config.to_dict(),
-                             "bots": [{"spec": b.spec, "count": b.count} for b in self.defaults.bots]},
+                             "bots": bot_list(self.defaults)},
                 "bots": [b.to_dict() for b in discover_bots(self.extra_specs)],
                 "maps": maps.catalog(),
                 "survival": {"defaults": SurvivalSettings().to_dict(),
@@ -168,7 +170,7 @@ class BattleServer:
             except (tomllib.TOMLDecodeError, BattleConfigError) as exc:
                 raise ValueError(f"TOML: {exc}") from exc
             await ws.send(json.dumps({"type": "toml_parsed", "config": bf.config.to_dict(),
-                                      "bots": [{"spec": b.spec, "count": b.count} for b in bf.bots]}))
+                                      "bots": bot_list(bf)}))
         elif kind == "pause":
             self._paused = True
             await self._broadcast({"type": "paused", "paused": True})
@@ -207,11 +209,17 @@ class BattleServer:
     async def _start(self, config: dict[str, Any], bots: list[dict[str, Any]]) -> None:
         bots = [b for b in bots if int(b.get("count", 0)) > 0]
         try:
-            bf = BattleFile.from_dict({**config, "bots": bots})
+            solo = [{"spec": b["spec"], "count": b["count"]} for b in bots if not b.get("team")]
+            teams: dict[str, list] = {}
+            for b in bots:
+                if b.get("team"):
+                    teams.setdefault(str(b["team"]), []).append({"spec": b["spec"], "count": b["count"]})
+            bf = BattleFile.from_dict({**config, "bots": solo,
+                                       "teams": [{"name": n, "members": m} for n, m in teams.items()]})
             # Starting bot processes takes a moment; keep the event loop responsive.
             runner = await asyncio.to_thread(BattleRunner, bf.config, bf.bots,
                                              time_budget_ms=self.time_budget_ms, data_dir=self.data_dir,
-                                             console=True)
+                                             console=True, teams=bf.teams)
         except (BattleConfigError, ValueError, ImportError, AttributeError, RuntimeError, OSError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
             return
@@ -324,7 +332,10 @@ class BattleServer:
                 self._last_round_start = json.dumps({
                     "type": "round_start", "round": runner.round, "rounds": bf.config.rounds,
                     "world": world, "config": bf.config.to_dict(),
+                    "teams": list(runner.teams),
                     "bots": [{"id": bid, "name": name, "class": cls.__name__,
+                              "team": runner.team_of[bid], "leader": bid in runner.leaders,
+                              "droid": bool(arena.slots[bid].agent.droid),
                               "colors": dict(arena.slots[bid].agent.colors),
                               "owned": bid in arena.console_ids,
                               "view": arena.slots[bid].agent.profile.max_perception_range}
@@ -341,7 +352,8 @@ class BattleServer:
                 ranking = runner.end_round()
                 await self._broadcast({"type": "round_end", "round": runner.round,
                                        "rounds": bf.config.rounds, "ranking": ranking,
-                                       "survivors": len(arena.standing())})
+                                       "survivors": len(arena.standing()),
+                                       "teams_left": len(arena.teams_standing())})
                 if not runner.done:
                     await asyncio.sleep(ROUND_END_PAUSE_S)
             results = runner.results()
@@ -349,9 +361,9 @@ class BattleServer:
             print(f"  Battle finished, results saved to {path}")
             print(results.table())
             await self._broadcast({"type": "battle_end", "results": results.rows,
+                                   "teams": results.teams,
                                    "rounds": results.rounds, "saved_to": str(path),
-                                   "config": bf.config.to_dict(),
-                                   "bots": [{"spec": b.spec, "count": b.count} for b in bf.bots]})
+                                   "config": bf.config.to_dict(), "bots": bot_list(bf)})
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -359,6 +371,13 @@ class BattleServer:
             await self._broadcast({"type": "error", "message": f"Battle crashed: {exc}"})
         finally:
             runner.close()
+
+
+def bot_list(bf: BattleFile) -> list[dict[str, Any]]:
+    """The battle's bots as setup-screen rows: solo bots, then team members in order."""
+    rows: list[dict[str, Any]] = [{"spec": b.spec, "count": b.count, "team": None} for b in bf.bots]
+    rows += [{"spec": m.spec, "count": m.count, "team": t.name} for t in bf.teams for m in t.members]
+    return rows
 
 
 def _load_class(spec: str) -> type:

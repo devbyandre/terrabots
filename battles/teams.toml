@@ -1,0 +1,30 @@
+# A team battle: two teams of three plus two bots fighting alone.
+# terrabots-battle battles/teams.toml           (viewer)
+# terrabots-battle battles/teams.toml --headless
+rounds = 10
+seed = 7
+terrain = "map"
+map = "twin-hills"
+team_leader_bonus = 100.0     # the first member of each team starts with 200 energy
+droid_bonus = 20.0            # droids: 120 energy, no radar
+# team_message_range = 25.0   # uncomment: teammates only hear each other within 25 cells, in line of sight
+
+[[teams]]
+name = "Blue Squad"
+[[teams.members]]
+spec = "terrabots.agents.squad:SquadLeader"
+[[teams.members]]
+spec = "terrabots.agents.squad:SquadDroid"
+count = 2
+
+[[teams]]
+name = "Trackers"
+[[teams.members]]
+spec = "terrabots.agents.tracker:Tracker"
+count = 3
+
+[[bots]]
+spec = "terrabots.agents.crazy:Crazy"
+
+[[bots]]
+spec = "terrabots.agents.spin_bot:SpinBot"

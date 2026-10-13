@@ -25,6 +25,7 @@ from terrabots.battle.events import (
     HitByBullet,
     HitWall,
     ScannedBot,
+    TeamMessage,
 )
 
 if TYPE_CHECKING:
@@ -100,6 +101,7 @@ class BattleObservation:
     bot_death: list[BotDeath] = field(default_factory=list)
     skipped_turns: int = 0           # your turns skipped so far this round (too slow / errors)
     inbox: list[Message] = field(default_factory=list)
+    team_messages: list[TeamMessage] = field(default_factory=list)   # from teammates, sent last tick
 
     @property
     def cell(self) -> tuple[int, int]:

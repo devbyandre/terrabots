@@ -14,8 +14,9 @@ Persistent bot storage: a small data folder per bot class (Robocode's getDataDir
   returns False) and the old file stays.
 - Without a data directory (e.g. tests, notebooks) storage lives in memory only.
 
-It's a convenience and a fairness rule, not a sandbox: bot code can still open
-files itself (see SECURITY.md).
+It's a convenience and a fairness rule, not a sandbox: in-process bot code can
+still open files itself. Others' bots run in terrabots.battle.sandbox, where
+/data is the only writable storage (see docs/sandbox.md).
 """
 
 from __future__ import annotations

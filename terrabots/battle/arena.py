@@ -52,7 +52,7 @@ from terrabots.battle.events import (
     TeamMessage,
 )
 from terrabots.battle.geometry import clamp, distance, heading_to, normalize_heading
-from terrabots.battle.isolation import BotProcessError, ProcessBot
+from terrabots.battle.isolation import BotProcessError, RemoteBot
 from terrabots.battle.observation import BattleObservation, TerrainView
 from terrabots.battle.physics import (
     ALIVE,
@@ -230,7 +230,7 @@ class Arena:
         for s in standing:
             s.drawings = []
             s.console = []
-        remote = [s for s in active if isinstance(s.agent, ProcessBot)]
+        remote = [s for s in active if isinstance(s.agent, RemoteBot)]
         for s in remote:
             s.agent.request_decide(self._observe(s))
         actions = {s.body.bot_id: BattleAction() for s in standing}

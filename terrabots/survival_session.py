@@ -98,10 +98,16 @@ class SurvivalSession:
                                     regen_rate=s.regen_rate, forage_amount=s.forage_amount,
                                     forage_cost=s.forage_cost, spawn_rate=s.spawn_rate)))
         self.names: dict[int, str] = {}
+        from terrabots.battle.sandbox import SandboxAgent, SandboxEntry
+
         for cls, count in entries:
-            for i, agent in enumerate(self.sim.add_agent(cls, count=count)):
-                self.names[agent.agent_id] = f"{cls.__name__} ({i + 1})" if count > 1 else cls.__name__
-                if is_users_bot(cls.__module__):
+            if isinstance(cls, SandboxEntry):      # someone else's agent: one container each
+                name, make, own = cls.class_name, SandboxAgent.factory(cls, s.seed), False
+            else:
+                name, make, own = cls.__name__, cls, is_users_bot(cls.__module__)
+            for i, agent in enumerate(self.sim.add_agent(make, count=count)):
+                self.names[agent.agent_id] = f"{name} ({i + 1})" if count > 1 else name
+                if own:
                     self.sim.console_ids.add(agent.agent_id)
         self.tick = 0
         self.died_at: dict[int, int] = {}
@@ -138,8 +144,12 @@ class SurvivalSession:
             }
         return frame
 
+    def close(self) -> None:
+        """Stop sandboxed agents' containers."""
+        self.sim.close()
+
     def agents_info(self) -> list[dict[str, Any]]:
-        return [{"id": aid, "name": name, "class": type(self.sim._agents[aid]).__name__,
+        return [{"id": aid, "name": name, "class": _class_of(self.sim._agents[aid]),
                  "owned": aid in self.sim.console_ids}
                 for aid, name in self.names.items()]
 
@@ -147,7 +157,7 @@ class SurvivalSession:
         """Per class: survivors, average lifetime and end energy; best first."""
         by_class: dict[str, dict[str, Any]] = {}
         for aid, agent in self.sim._agents.items():
-            cls = type(agent).__name__
+            cls = _class_of(agent)
             row = by_class.setdefault(cls, {"class": cls, "count": 0, "alive": 0,
                                             "lifetime_sum": 0, "energy_sum": 0.0})
             row["count"] += 1
@@ -164,3 +174,7 @@ class SurvivalSession:
         for rank, r in enumerate(rows, 1):
             r["rank"] = rank
         return rows
+
+
+def _class_of(agent: Agent) -> str:
+    return getattr(agent, "class_name", type(agent).__name__)

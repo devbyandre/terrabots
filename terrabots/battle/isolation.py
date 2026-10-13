@@ -57,7 +57,7 @@ def spec_of(cls: type) -> str:
 # Child side
 # ---------------------------------------------------------------------------
 
-def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None, cwd: str,
+def _child_main(conn: Connection, spec: str, seed: int | None, cwd: str,
                 data_dir: str | None = None, quota_kb: int = 200) -> None:
     import os
     import sys
@@ -69,13 +69,17 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
 
     if seed is not None:
         random.seed(seed)
-    movement = MovementResolver(world)
     try:
         cls = load_bot_class(spec)
     except Exception:
         conn.send(("error", traceback.format_exc()))
         return
     conn.send(("ready", cls.__name__, bool(cls.droid)))
+    # The terrain comes over the pipe, not as a Process argument: Python writes
+    # arguments into a pipe it keeps open itself, so a child that dies early
+    # (e.g. can't import __main__) would leave the parent writing forever.
+    _, world = conn.recv()
+    movement = MovementResolver(world)
     memory: dict[str, Any] = {}
     from terrabots.battle.runner import storage_key
     from terrabots.battle.storage import BotStorage
@@ -134,8 +138,35 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
 # Parent side
 # ---------------------------------------------------------------------------
 
-class ProcessBot(BattleAgent):
-    """Arena-facing proxy for a bot running in its own process."""
+class RemoteBot(BattleAgent):
+    """A bot whose decide() runs somewhere else (a process, a container). The arena
+    sends every remote bot its observation first, then collects the answers, so
+    they all think in parallel."""
+
+    last_elapsed_ms = 0.0
+    last_console: list[str] = []
+
+    @property
+    def is_dead(self) -> bool:
+        raise NotImplementedError
+
+    def request_decide(self, obs: BattleObservation) -> None:
+        raise NotImplementedError
+
+    def collect_decide(self, budget_ms: float | None) -> BattleAction:
+        raise NotImplementedError
+
+    def decide(self, obs: BattleObservation) -> BattleAction:
+        self.request_decide(obs)
+        return self.collect_decide(None)
+
+    def close(self) -> None:
+        """Stop it. Safe to call more than once."""
+
+
+class ProcessBot(RemoteBot):
+    """Arena-facing proxy for a bot running in its own process (trusted code:
+    replies are unpickled, so use terrabots.battle.sandbox for others' bots)."""
 
     def __init__(self, spec: str, world: WorldGrid, seed: int | None,
                  data_dir: str | None = None, quota_kb: int = 200) -> None:
@@ -146,7 +177,8 @@ class ProcessBot(BattleAgent):
         self.class_name = spec.rpartition(":")[2]
         ctx = mp.get_context("spawn")   # safe with the viewer's threads; same on every OS
         self._conn, child = ctx.Pipe()
-        self._proc = ctx.Process(target=_child_main, args=(child, spec, world, seed, os.getcwd(), data_dir, quota_kb),
+        self._world = world
+        self._proc = ctx.Process(target=_child_main, args=(child, spec, seed, os.getcwd(), data_dir, quota_kb),
                                  daemon=True, name=f"bot:{spec}")
         self._proc.start()
         child.close()
@@ -167,6 +199,7 @@ class ProcessBot(BattleAgent):
             self.close()
             raise BotProcessError(f"{self.spec} failed to load:\n{reply[1]}")
         self.class_name, self.droid = reply[1], reply[2]
+        self._send(("world", self._world))
 
     # --- lifecycle hooks -------------------------------------------------
 
@@ -211,10 +244,6 @@ class ProcessBot(BattleAgent):
             self._outbox = outbox
             self.adjust_gun_for_body_turn, self.adjust_radar_for_gun_turn = adj_gun, adj_radar
             return action
-
-    def decide(self, obs: BattleObservation) -> BattleAction:
-        self.request_decide(obs)
-        return self.collect_decide(None)
 
     # --- plumbing -------------------------------------------------------
 

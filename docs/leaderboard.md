@@ -1,6 +1,6 @@
 # Leaderboard
 
-Generated 2026-10-13 by `tools/tournament.py`. Every battle is seeded; learning bots start with empty storage. Submit your bot: see [CONTRIBUTING.md](../CONTRIBUTING.md#submit-a-bot).
+Generated 2026-10-13 by `tools/tournament.py`. Every battle is seeded; learning bots start with empty storage. Submitted bots play in the [sandbox](sandbox.md); "closed source" bots are private submissions, whose code isn't published. Submit yours: see [CONTRIBUTING.md](../CONTRIBUTING.md#submit-a-bot).
 
 ## 1v1
 

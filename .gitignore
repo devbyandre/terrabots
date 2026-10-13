@@ -9,3 +9,6 @@ dist/
 results/
 .DS_Store
 bot_data/
+
+# Private bot submissions: run by the tournament, never committed
+submissions/

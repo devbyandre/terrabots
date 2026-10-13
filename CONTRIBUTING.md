@@ -28,33 +28,55 @@ pytest -q
 
 ## Submit a bot
 
-Got a bot you're proud of? Put it in the ring. Every bot in `contrib/` takes part
-in the tournament behind the [leaderboard](docs/leaderboard.md) (1v1, melee and
-survival rankings, re-run every week and whenever a bot is added).
+Got a bot you're proud of? Put it in the ring. Submitted bots take part in the
+tournament behind the [leaderboard](docs/leaderboard.md) (1v1, melee and
+survival rankings).
 
-1. Fork the repo and add your bot as `contrib/<your-github-name>/<bot>.py`, with an
-   empty `__init__.py` next to it. One or more `BattleAgent` (battle) or `Agent`
-   (survival) classes per file; the first line of the class docstring is shown in
-   the setup screen and on the leaderboard.
-2. Check it plays: `terrabots-battle --headless --rounds 10 --bot contrib.<you>.<bot>:<Class> --bot terrabots.agents.crazy:Crazy`
-   and, if you like, `python tools/tournament.py --quick`.
-3. Open a pull request (or a "Bot submission" issue with a link to your code).
+**Your code stays private unless you say otherwise.** There are two ways in:
 
-Rules, so the competition stays fair and safe for everyone who runs it:
+### Private (the default)
 
-- **Plain Python, MIT licensed**, standard library plus numpy. Other
-  dependencies only if the maintainers agree.
-- **No files or network:** use `self.storage` for data that should survive
-  between battles (200 KB); don't read or write anything else, don't open
-  connections, don't start processes or threads.
-- **Fair play:** use only what the observation and `self.rules` give you; no
-  reading other bots' memory, the engine's internals or the RNG state.
-- **Be quick:** stay within the 20 ms decide() budget; slow turns are skipped.
-- One file per bot, readable, with a docstring saying what it does. Learners read
-  these.
+Only your bot's name, your GitHub name and its scores are published, marked
+"closed source". The code and its description are not published, not shared and
+not reused; it's deleted from the tournament machine when you ask.
 
-Maintainers review submissions before merging (bots are code), and may remove
-bots that break the rules.
+1. Put your bot in a **private** GitHub repository, as `<your-github-name>/<bot>.py`
+   plus an empty `__init__.py` (one or more `BattleAgent` or survival `Agent`
+   classes per file).
+2. Give [@devbyandre](https://github.com/devbyandre) read access.
+3. Open a ["Bot submission" issue](https://github.com/devbyandre/terrabots/issues/new?template=bot-submission.yml)
+   with the repository's name. Don't paste code into the issue: issues are public.
+
+### Public (only if you want to)
+
+Open a pull request adding `contrib/<your-github-name>/<bot>.py` and an empty
+`__init__.py`. Its code is then public under the MIT license, listed in the
+setup screen ("Community bots"), and learners can read it. The first line of the
+class docstring is shown on the leaderboard.
+
+### Before you submit
+
+Check that it plays, sandboxed, the way the tournament will run it (needs Docker,
+see [docs/sandbox.md](docs/sandbox.md)):
+
+```bash
+docker build -t terrabots-sandbox -f docker/sandbox.Dockerfile docker/
+terrabots-battle --headless --sandbox --rounds 10 --bot contrib.<you>.<bot>:<Class> --bot terrabots.agents.crazy:Crazy
+```
+
+### Rules
+
+- **Plain Python**, standard library plus numpy, nothing else to install.
+- **Inside the sandbox:** every submitted bot runs in a locked-down container with
+  no network and no access to anything but its own folder. `self.storage` works
+  (200 KB, kept for one battle); files and connections don't.
+- **Fair play:** use only what the observation and `self.rules` give you. The
+  standard movement profile applies to everyone (a bot's own `profile` is ignored).
+- **Be quick:** stay within the 20 ms `decide()` budget; slow turns are skipped,
+  and a bot that stops answering is stopped.
+- **Your own work.** Readable, with a docstring saying what the bot does.
+
+Bots that break the rules or try to escape the sandbox are removed.
 
 ## Good first contributions
 

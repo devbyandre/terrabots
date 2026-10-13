@@ -6,13 +6,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for entering! A pull request adding `contrib/<your-github-name>/<bot>.py` is the quickest way;
-        if you'd rather not, link your code below and a maintainer will add it. Rules: see CONTRIBUTING.md#submit-a-bot.
+        Thanks for entering! **Don't paste code here: issues are public.**
+        Private (default): put your bot in a private GitHub repository and give @devbyandre read access.
+        Public: open a pull request adding `contrib/<your-github-name>/<bot>.py` instead.
+        Details and rules: CONTRIBUTING.md#submit-a-bot.
   - type: input
     id: name
     attributes:
-      label: Bot name and class
-      placeholder: "MyTank (contrib.yourname.my_tank:MyTank)"
+      label: Bot class name(s)
+      placeholder: "MyTank"
     validations:
       required: true
   - type: dropdown
@@ -23,22 +25,33 @@ body:
     validations:
       required: true
   - type: input
-    id: code
+    id: repo
     attributes:
-      label: Link to the code (PR, gist or repo)
+      label: Private repository (owner/name), or the number of your pull request
+      placeholder: "yourname/my-terrabots-bot"
+    validations:
+      required: true
+  - type: dropdown
+    id: publish
+    attributes:
+      label: May we publish the code?
+      description: Without a yes here, only the bot's name, your GitHub name and its scores are published.
+      options:
+        - "No: keep my code private (closed source on the leaderboard)"
+        - "Yes: publish it in contrib/ under the MIT license"
     validations:
       required: true
   - type: textarea
     id: strategy
     attributes:
-      label: Strategy in a few sentences
-      description: Movement, radar, gun, anything clever. This helps learners.
+      label: Strategy (optional)
+      description: Shown publicly only if you chose to publish your code.
   - type: checkboxes
     id: rules
     attributes:
       label: Rules
       options:
-        - label: The bot is my own work and MIT licensed
+        - label: The bot is my own work
           required: true
-        - label: It doesn't use files (besides self.storage), the network, processes or threads
+        - label: It plays in the sandbox (no network, files only via self.storage), see CONTRIBUTING.md
           required: true

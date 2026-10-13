@@ -37,10 +37,11 @@ import numpy as np
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.http11 import Request, Response
 
-from terrabots.battle.config import BattleConfigError, BattleFile
+from terrabots.battle.config import BattleConfigError, BattleFile, BotEntry, TeamEntry
+from terrabots.battle.sandbox import SandboxEntry
 from terrabots.battle.discovery import discover_bots
 from terrabots import maps
-from terrabots.battle.runner import BattleRunner
+from terrabots.battle.runner import BattleRunner, class_name
 from terrabots.framework.agent import Agent
 from terrabots.survival_session import SurvivalSession, SurvivalSettings, SurvivalSettingsError
 from terrabots.world_terrain import TerrainType, WorldGrid
@@ -217,9 +218,11 @@ class BattleServer:
             bf = BattleFile.from_dict({**config, "bots": solo,
                                        "teams": [{"name": n, "members": m} for n, m in teams.items()]})
             # Starting bot processes takes a moment; keep the event loop responsive.
-            runner = await asyncio.to_thread(BattleRunner, bf.config, bf.bots,
+            runner = await asyncio.to_thread(BattleRunner, bf.config, [_place(b) for b in bf.bots],
                                              time_budget_ms=self.time_budget_ms, data_dir=self.data_dir,
-                                             console=True, teams=bf.teams)
+                                             console=True,
+                                             teams=[TeamEntry(t.name, [_place(m) for m in t.members])
+                                                    for t in bf.teams])
         except (BattleConfigError, ValueError, ImportError, AttributeError, RuntimeError, OSError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
             return
@@ -254,11 +257,16 @@ class BattleServer:
             entries = []
             for a in agents:
                 count = int(a.get("count", 0))
-                if count > 0:
-                    cls = _load_class(str(a["spec"]))
-                    if not (isinstance(cls, type) and issubclass(cls, Agent)):
-                        raise ValueError(f"{a['spec']} is not a survival Agent")
-                    entries.append((cls, count))
+                if count <= 0:
+                    continue
+                placed = _place(BotEntry(str(a["spec"]), count))
+                if isinstance(placed, tuple):          # someone else's: sandboxed
+                    entries.append(placed)
+                    continue
+                cls = _load_class(placed.spec)
+                if not (isinstance(cls, type) and issubclass(cls, Agent)):
+                    raise ValueError(f"{a['spec']} is not a survival Agent")
+                entries.append((cls, count))
             session = await asyncio.to_thread(SurvivalSession, settings, entries)
         except (SurvivalSettingsError, ValueError, ImportError, AttributeError, RuntimeError, OSError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
@@ -278,6 +286,8 @@ class BattleServer:
             except asyncio.CancelledError:
                 pass
         self._task = None
+        if self._survival is not None:
+            await asyncio.to_thread(self._survival.close)
         self._survival = None
         self._last_round_start = self._last_frame = None
 
@@ -323,6 +333,8 @@ class BattleServer:
         except Exception as exc:
             logger.exception("Survival run crashed")
             await self._broadcast({"type": "error", "message": f"Survival run crashed: {exc}"})
+        finally:
+            await asyncio.to_thread(session.close)   # sandboxed agents' containers
 
     async def _run(self, runner: BattleRunner, bf: BattleFile) -> None:
         world = world_payload(runner.world)
@@ -333,7 +345,7 @@ class BattleServer:
                     "type": "round_start", "round": runner.round, "rounds": bf.config.rounds,
                     "world": world, "config": bf.config.to_dict(),
                     "teams": list(runner.teams),
-                    "bots": [{"id": bid, "name": name, "class": cls.__name__,
+                    "bots": [{"id": bid, "name": name, "class": class_name(cls),
                               "team": runner.team_of[bid], "leader": bid in runner.leaders,
                               "droid": bool(arena.slots[bid].agent.droid),
                               "colors": dict(arena.slots[bid].agent.colors),
@@ -371,6 +383,14 @@ class BattleServer:
             await self._broadcast({"type": "error", "message": f"Battle crashed: {exc}"})
         finally:
             runner.close()
+
+
+SANDBOXED_PREFIXES = ("contrib.", "submissions.")
+
+
+def _place(b: BotEntry) -> BotEntry | tuple[SandboxEntry, int]:
+    """Other people's bots (contrib/, submissions/) play sandboxed and are never imported here."""
+    return (SandboxEntry(b.spec), b.count) if b.spec.startswith(SANDBOXED_PREFIXES) else b
 
 
 def bot_list(bf: BattleFile) -> list[dict[str, Any]]:

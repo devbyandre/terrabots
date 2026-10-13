@@ -175,6 +175,12 @@ class Simulation:
     # Main loop
     # ------------------------------------------------------------------
 
+    def close(self) -> None:
+        """Stop agents that run elsewhere (sandboxed ones). Safe to call more than once."""
+        for agent in self._agents.values():
+            if hasattr(agent, "close"):
+                agent.close()
+
     def run(self, ticks: int, verbose: bool = False) -> list[TickSnapshot]:
         """Run the simulation for `ticks` ticks. Returns all tick snapshots."""
         snapshots: list[TickSnapshot] = []
@@ -211,7 +217,15 @@ class Simulation:
         # 2. Collect decisions (all agents decide before any action is applied)
         decisions: dict[int, Action] = {}
         self.last_console = {}
+        # Agents running elsewhere (sandboxed) all get their observation first and
+        # think in parallel; then the answers are collected.
+        remote = [a for a in alive_agents if hasattr(a, "request_decide")]
+        for agent in remote:
+            agent.request_decide(observations[agent.agent_id])
         for agent in alive_agents:
+            if agent in remote:
+                decisions[agent.agent_id] = agent.collect_decide()
+                continue
             with capture(agent, agent.agent_id in self.console_ids) as lines:
                 decisions[agent.agent_id] = agent.decide(observations[agent.agent_id])
             if lines:
@@ -481,7 +495,7 @@ class Simulation:
             agents=[
                 {
                     "id": a.agent_id,
-                    "class": a.__class__.__name__,
+                    "class": getattr(a, "class_name", a.__class__.__name__),
                     "pos": list(a.pos),
                     "energy": round(a.energy, 2),
                     "alive": a.alive,

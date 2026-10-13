@@ -9,6 +9,11 @@ terrabots-battle: run a Robocode-style battle, in the browser or headless.
         --bot terrabots.agents.tracker:Tracker=2 --bot bots.my_bot:MyBot
 
 --bot entries replace the file's bots. Results are saved to results/<timestamp>.json/.csv.
+
+Someone else's bot? Run it with --headless --sandbox: every bot that isn't a
+built-in one (terrabots.*) runs in a locked-down Docker container and is never
+imported here (see terrabots.battle.sandbox; needs Docker and the
+terrabots-sandbox image).
 """
 
 from __future__ import annotations
@@ -45,6 +50,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--seed", type=int, help="override seed")
     p.add_argument("--isolation", choices=["none", "process"],
                    help="run each bot in its own process (overrides the battle file)")
+    p.add_argument("--sandbox", action="store_true",
+                   help="headless: run every non-built-in bot in a Docker sandbox (for bots you don't trust)")
     p.add_argument("--no-time-limit", action="store_true",
                    help="never skip slow turns (also automatic under a debugger)")
     p.add_argument("--results-dir", default="results", help="where to save results (default results/)")
@@ -85,12 +92,22 @@ def main(argv: list[str] | None = None) -> None:
     bf = load_battle(args)
     budget = None if args.no_time_limit else "config"
 
+    if args.sandbox and not args.headless:
+        raise SystemExit("terrabots-battle: --sandbox works with --headless only (the setup screen "
+                         "imports the bots it lists)")
     if args.headless:
+        from terrabots.battle.config import TeamEntry
         from terrabots.battle.runner import BattleRunner
+        from terrabots.battle.sandbox import SandboxEntry
+
+        def place(b: BotEntry):
+            trusted = not args.sandbox or b.spec.startswith("terrabots.")
+            return b if trusted else (SandboxEntry(b.spec), b.count)
 
         try:
-            runner = BattleRunner(bf.config, bf.bots, time_budget_ms=budget, data_dir=args.data_dir,
-                                  teams=bf.teams)
+            runner = BattleRunner(bf.config, [place(b) for b in bf.bots], time_budget_ms=budget,
+                                  data_dir=args.data_dir,
+                                  teams=[TeamEntry(t.name, [place(m) for m in t.members]) for t in bf.teams])
         except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
             raise SystemExit(f"terrabots-battle: {exc}") from exc
         n_bots = sum(b.count for b in bf.bots) + sum(m.count for t in bf.teams for m in t.members)

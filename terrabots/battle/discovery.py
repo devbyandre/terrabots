@@ -34,6 +34,7 @@ class BotInfo:
     doc: str      # first line of the class docstring
     source: str   # "yours", "built-in" or "extra"
     droid: bool = False   # battle bots: a Droid (no radar)
+    sandboxed: bool = False   # others' code: found by reading the source, played in the sandbox
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -75,12 +76,17 @@ def discover_bots(extra_specs: list[str] | None = None,
     for path in sorted(_BUILTIN_DIR.glob("*.py")):
         if path.stem != "__init__":
             bots += _bots_in_module(f"terrabots.agents.{path.stem}", "built-in", base)
-    # Community submissions: contrib/<author>/<bot>.py (in a checkout of the repo)
+    # Community bots, contrib/<author>/<bot>.py: other people's code, so they are
+    # listed by reading the source (never imported here) and play in the sandbox.
+    from terrabots.battle.sandbox import find_bots
+
+    kind = "battle" if issubclass(base, BattleAgent) else "survival"
     contrib = Path("contrib")
     if contrib.is_dir():
         for path in sorted(contrib.glob("*/*.py")):
             if path.stem != "__init__":
-                bots += _bots_in_module(f"contrib.{path.parent.name}.{path.stem}", "community", base)
+                bots += [BotInfo(b.spec, b.name, b.doc, "community", b.droid, sandboxed=True)
+                         for b in find_bots(path, f"contrib.{path.parent.name}.{path.stem}") if b.kind == kind]
 
     known = {b.spec for b in bots}
     for spec in extra_specs or []:

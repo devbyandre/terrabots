@@ -313,9 +313,10 @@ a bot is added). Current top three:
 | 2. Crazy 73.1 | 2. FirstTank 139 % | 2. Grazer 205 |
 | 3. SquadLeader 68.1 | 3. SquadLeader 137 % | 3. Sharer 171 |
 
-Full tables: [docs/leaderboard.md](docs/leaderboard.md). So far it's only the demo
-bots. **Put yours on the board:** add it as `contrib/<your-github-name>/<bot>.py`
-and open a pull request; the rules are in
+Full tables: [docs/leaderboard.md](docs/leaderboard.md). **Put yours on the
+board.** Your code stays private unless you choose to publish it: share a private
+repository and only your bot's name and scores appear, marked closed source. Every
+submitted bot plays in a locked-down [sandbox](docs/sandbox.md). How to submit:
 [CONTRIBUTING.md](CONTRIBUTING.md#submit-a-bot).
 
 ## Project layout
@@ -356,9 +357,15 @@ tests/             pytest suite
 Bots are ordinary Python. With `bot_isolation = "process"` (the default in
 `battles/example.toml`, or `--isolation process`) every bot runs in its own
 process: bots think in parallel, and a bot that hangs is killed after a hard time
-limit. That keeps a battle running, but it is **not a sandbox**: running someone
-else's bot still means running their code, so only run bots you trust. See
-[SECURITY.md](SECURITY.md).
+limit. That's for your own bots.
+
+**Someone else's bot goes in the sandbox:** its own Docker container, no network,
+no access to your files or other bots, checked JSON instead of pickles, never
+imported on your machine. Community bots and the tournament use it
+automatically; for a bot someone sent you, run
+`terrabots-battle --headless --sandbox --bot their.module:Bot ...`. See
+[docs/sandbox.md](docs/sandbox.md) for what it does and doesn't protect against,
+and [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

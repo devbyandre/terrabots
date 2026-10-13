@@ -43,7 +43,8 @@ from terrabots import map_generator
 from terrabots.battle.agent import BattleAgent
 from terrabots.battle.arena import Arena
 from terrabots.battle.config import BattleConfig, BotEntry, TeamEntry, validate_teams
-from terrabots.battle.isolation import ProcessBot, spec_of, start_bots
+from terrabots.battle.isolation import RemoteBot, spec_of, start_bots
+from terrabots.battle.sandbox import SandboxEntry, start_sandboxed
 from terrabots.battle.storage import BotStorage
 from terrabots.console import is_users_bot
 
@@ -51,6 +52,11 @@ from terrabots.console import is_users_bot
 def storage_key(cls: type) -> str:
     """Storage folder name for a bot class: its import path."""
     return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def class_name(bot: type | SandboxEntry) -> str:
+    """A bot class's name; sandboxed bots are never imported here, so theirs comes from the spec."""
+    return bot.class_name if isinstance(bot, SandboxEntry) else bot.__name__
 from terrabots.battle.scoring import BotScore
 from terrabots.world_terrain import WorldGrid
 
@@ -159,7 +165,7 @@ class BattleRunner:
         self.console = console      # capture the user's bots' prints/logs for the viewer
         self.data_dir = data_dir    # bot storage root; None = in memory only
 
-        def resolve(b: Any) -> tuple[type[BattleAgent], int]:
+        def resolve(b: Any) -> tuple[type[BattleAgent] | SandboxEntry, int]:
             return (load_bot_class(b.spec), b.count) if isinstance(b, BotEntry) else b
 
         team_entries = [t if isinstance(t, TeamEntry) else TeamEntry(t[0], list(t[1])) for t in teams or []]
@@ -200,7 +206,7 @@ class BattleRunner:
             for _ in range(count):
                 seen[cls] = seen.get(cls, 0) + 1
                 many = totals_per_class[cls] > 1
-                self.names.append((cls, f"{cls.__name__} ({seen[cls]})" if many else cls.__name__))
+                self.names.append((cls, f"{class_name(cls)} ({seen[cls]})" if many else class_name(cls)))
                 self.team_of.append(team)
         members: dict[str, list[int]] = {}
         for bid, team in enumerate(self.team_of):
@@ -210,23 +216,34 @@ class BattleRunner:
         self.leaders = {ids[0] for ids in members.values() if len(ids) > 1}
         self.team_places: dict[str, list[int]] = {t: [0, 0, 0] for t in members}
         self.totals: dict[int, BotScore] = {
-            bid: BotScore(name, cls.__name__) for bid, (cls, name) in enumerate(self.names)
+            bid: BotScore(name, class_name(cls)) for bid, (cls, name) in enumerate(self.names)
         }
         self.round_rankings: list[dict[str, Any]] = []
 
-        # One process per bot for the whole battle (bot_isolation = "process").
-        self.processes: list[ProcessBot] = []
+        # Bots that run elsewhere, by bot id, for the whole battle: sandboxed bots
+        # always (one container each), the others in processes if bot_isolation = "process".
+        self.remote: dict[int, RemoteBot] = {}
+        sandboxed = [(bid, cls) for bid, (cls, _) in enumerate(self.names) if isinstance(cls, SandboxEntry)]
+        if sandboxed:
+            self.remote.update(start_sandboxed(sandboxed, self.world, config.seed, config.bot_storage_quota_kb))
         if config.bot_isolation == "process":
-            self.processes = start_bots([spec_of(cls) for cls, _ in self.names], self.world, config,
-                                        data_dir)
-        # One storage per bot class (in-process bots); process bots open their own.
+            local = [bid for bid, (cls, _) in enumerate(self.names) if not isinstance(cls, SandboxEntry)]
+            try:
+                procs = start_bots([spec_of(self.names[bid][0]) for bid in local], self.world, config, data_dir)
+            except Exception:
+                self.close()
+                raise
+            self.remote.update(zip(local, procs))
+        self.processes = list(self.remote.values())
+        # One storage per bot class (in-process bots); remote bots open their own.
         self.storages = {cls: BotStorage(data_dir, storage_key(cls), config.bot_storage_quota_kb)
-                         for cls, _ in self.entries}
+                         for cls, _ in self.entries if not isinstance(cls, SandboxEntry)}
 
     def close(self) -> None:
         """Stop bot processes. Safe to call more than once."""
-        for p in self.processes:
+        for p in self.remote.values():
             p.close()
+        self.remote = {}
         self.processes = []
 
     def __enter__(self) -> "BattleRunner":
@@ -243,21 +260,21 @@ class BattleRunner:
         self.round += 1
         agents: list[BattleAgent] = []
         for bid, (cls, name) in enumerate(self.names):
-            agent = self.processes[bid] if self.processes else cls()
+            agent = self.remote[bid] if bid in self.remote else cls()
             agent.bot_id, agent.name = bid, name
             agent.rules = dataclasses.replace(self.config)
             agent.team = self.team_of[bid]
             agent.teammates = {o: self.names[o][1] for o in self.teams.get(agent.team, []) if o != bid}
             agent.is_leader = bid in self.leaders
-            if not self.processes:
+            if bid not in self.remote:
                 agent.memory = self.memory[cls]
                 agent.storage = self.storages[cls]
             agents.append(agent)
         console_ids = {bid for bid, (cls, _) in enumerate(self.names)
-                       if self.console and is_users_bot(cls.__module__)}
+                       if self.console and not isinstance(cls, SandboxEntry) and is_users_bot(cls.__module__)}
         for bid in console_ids:
-            if self.processes:
-                self.processes[bid].console = True
+            if bid in self.remote:
+                self.remote[bid].console = True
         self.arena = Arena(self.config, self.world, agents, self.round, self.rng,
                            time_budget_ms=self.time_budget_ms, console_ids=console_ids)
         self.arena_finished = False

@@ -19,7 +19,19 @@
 - Tournament and leaderboard (`tools/tournament.py`), bot submissions in
   `contrib/`, Jupyter notebooks, an animated battle in the README.
 
+- Sandbox for other people's bots (`terrabots.battle.sandbox`, docs/sandbox.md):
+  a Docker container per bot without network or access to your files, a checked
+  JSON protocol, no host imports. Used for `contrib/` and `submissions/` in the
+  tournament and the setup screen, and by `terrabots-battle --headless --sandbox`.
+- Private bot submissions (the default): only name, author and scores are
+  published. `tools/tournament.py --extra SPEC@AUTHOR` adds your own closed-source
+  bots.
+
 ### Changed
+- The tournament workflow only checks pull requests (sandboxed, read-only); the
+  leaderboard is built by the maintainer, where private submissions are.
+- Process isolation sends the terrain after the bot has started, so a bot that
+  fails to start reports an error instead of hanging the battle.
 - Results CSV/JSON have a `team` column (last, so existing scripts keep working).
 - Bot names are numbered when a class appears more than once in a battle, also
   across teams. Classes whose names start with `_` aren't listed as bots.

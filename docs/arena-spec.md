@@ -180,10 +180,11 @@ For an educational platform:
   `decide_time_budget_ms` skips that bot's turn (Robocode "skipped turns"). An
   exception in `decide()` is logged and counted as a skipped turn. Five consecutive
   exceptions disable the bot.
-- **Later:** one subprocess per bot (multiprocessing pipes) for isolation and hard
-  time limits. The `BattleObservation`/`BattleAction` dataclasses are already
-  plain-data, so they serialise without redesign.
-- Document clearly in the README: only run bots you trust.
+- **Built:** one subprocess per bot (`bot_isolation = "process"`) for hard time
+  limits and parallel turns; trusted bots only (pickle).
+- **Built:** the sandbox for others' bots: one Docker container per bot, no
+  network, read-only, resource limits, JSON protocol with checked replies, bots
+  never imported on the host. See [sandbox.md](sandbox.md).
 
 ## 9. Open decisions
 

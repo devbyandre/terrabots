@@ -48,6 +48,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--no-time-limit", action="store_true",
                    help="never skip slow turns (also automatic under a debugger)")
     p.add_argument("--results-dir", default="results", help="where to save results (default results/)")
+    p.add_argument("--data-dir", default="bot_data",
+                   help="bots' persistent storage, one folder per bot class (default bot_data/)")
     p.add_argument("--host", default="localhost")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--log", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -87,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
         from terrabots.battle.runner import BattleRunner
 
         try:
-            runner = BattleRunner(bf.config, bf.bots, time_budget_ms=budget)
+            runner = BattleRunner(bf.config, bf.bots, time_budget_ms=budget, data_dir=args.data_dir)
         except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
             raise SystemExit(f"terrabots-battle: {exc}") from exc
         print(f"Terrabots battle: {sum(b.count for b in bf.bots)} bots, {bf.config.rounds} rounds, "
@@ -102,7 +104,7 @@ def main(argv: list[str] | None = None) -> None:
 
     server = BattleServer(bf, extra_specs=args.extra_bot, extra_agents=args.extra_agent,
                           host=args.host, port=args.port,
-                          results_dir=args.results_dir, time_budget_ms=budget,
+                          results_dir=args.results_dir, data_dir=args.data_dir, time_budget_ms=budget,
                           autostart=args.autostart)
     try:
         asyncio.run(server.serve_forever())

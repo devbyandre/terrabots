@@ -38,6 +38,12 @@ from terrabots.battle.agent import BattleAgent
 from terrabots.battle.arena import Arena
 from terrabots.battle.config import BattleConfig, BotEntry
 from terrabots.battle.isolation import ProcessBot, spec_of, start_bots
+from terrabots.battle.storage import BotStorage
+
+
+def storage_key(cls: type) -> str:
+    """Storage folder name for a bot class: its import path."""
+    return f"{cls.__module__}.{cls.__qualname__}"
 from terrabots.battle.scoring import BotScore
 from terrabots.world_terrain import WorldGrid
 
@@ -122,8 +128,10 @@ class BattleRunner:
     def __init__(self, config: BattleConfig,
                  bots: list[tuple[type[BattleAgent], int]] | list[BotEntry],
                  time_budget_ms: float | None | str = "config",
-                 on_round_start: Callable[[Arena], None] | None = None) -> None:
+                 on_round_start: Callable[[Arena], None] | None = None,
+                 data_dir: str | None = None) -> None:
         self.config = config
+        self.data_dir = data_dir    # bot storage root; None = in memory only
         self.entries: list[tuple[type[BattleAgent], int]] = [
             (load_bot_class(b.spec), b.count) if isinstance(b, BotEntry) else b for b in bots
         ]
@@ -157,7 +165,11 @@ class BattleRunner:
         # One process per bot for the whole battle (bot_isolation = "process").
         self.processes: list[ProcessBot] = []
         if config.bot_isolation == "process":
-            self.processes = start_bots([spec_of(cls) for cls, _ in self.names], self.world, config)
+            self.processes = start_bots([spec_of(cls) for cls, _ in self.names], self.world, config,
+                                        data_dir)
+        # One storage per bot class (in-process bots); process bots open their own.
+        self.storages = {cls: BotStorage(data_dir, storage_key(cls), config.bot_storage_quota_kb)
+                         for cls, _ in self.entries}
 
     def close(self) -> None:
         """Stop bot processes. Safe to call more than once."""
@@ -184,6 +196,7 @@ class BattleRunner:
             agent.rules = dataclasses.replace(self.config)
             if not self.processes:
                 agent.memory = self.memory[cls]
+                agent.storage = self.storages[cls]
             agents.append(agent)
         self.arena = Arena(self.config, self.world, agents, self.round, self.rng,
                            time_budget_ms=self.time_budget_ms)

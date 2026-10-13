@@ -71,13 +71,15 @@ class BattleServer:
     def __init__(self, defaults: BattleFile, extra_specs: list[str] | None = None,
                  extra_agents: list[str] | None = None,
                  host: str = "localhost", port: int = 8765,
-                 results_dir: str = "results", time_budget_ms: float | None | str = "config",
+                 results_dir: str = "results", data_dir: str | None = "bot_data",
+                 time_budget_ms: float | None | str = "config",
                  autostart: bool = False) -> None:
         self.defaults = defaults
         self.extra_specs = list(extra_specs or []) + [b.spec for b in defaults.bots]
         self.extra_agents = list(extra_agents or [])
         self.host, self.port = host, port
         self.results_dir = results_dir
+        self.data_dir = data_dir
         self.time_budget_ms = time_budget_ms
         self.autostart = autostart
 
@@ -192,7 +194,7 @@ class BattleServer:
             bf = BattleFile.from_dict({**config, "bots": bots})
             # Starting bot processes takes a moment; keep the event loop responsive.
             runner = await asyncio.to_thread(BattleRunner, bf.config, bf.bots,
-                                             time_budget_ms=self.time_budget_ms)
+                                             time_budget_ms=self.time_budget_ms, data_dir=self.data_dir)
         except (BattleConfigError, ValueError, ImportError, AttributeError, RuntimeError) as exc:
             await self._broadcast({"type": "error", "message": str(exc)})
             return

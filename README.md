@@ -113,6 +113,10 @@ path planning. It never sees global state: other bots are known only through rad
 `radar_turn` (degrees, clockwise, 0 = north) and `fire` power, all clamped by the
 rules each tick.
 
+**Persistent storage** (Robocode's data directory): `self.storage.save("stats", data)`
+and `self.storage.load("stats", default)` keep small JSON files per bot class
+between battles (`bot_data/`, 200 KB quota by default).
+
 **Graphical debugging** (Robocode's `onPaint`): draw in arena coordinates with
 `self.draw.line(...)`, `self.draw.circle(...)`, `self.draw.text(...)` inside
 `decide()`. The viewer shows them for the bot you follow, or for all bots with

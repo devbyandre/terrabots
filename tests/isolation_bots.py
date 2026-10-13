@@ -28,3 +28,13 @@ class Counter(BattleAgent):
         # Report what the process-local memory holds through a debug drawing.
         self.draw.text(0, 0, str(self.memory["rounds"]))
         return BattleAction()
+
+
+class Remember(BattleAgent):
+    """Counts the rounds it has played, across battles, in its storage."""
+
+    def on_round_start(self, round_number, rounds):
+        self.storage.save("count", self.storage.load("count", 0) + 1)
+
+    def decide(self, obs):
+        return BattleAction()

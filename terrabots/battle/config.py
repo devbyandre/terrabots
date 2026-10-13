@@ -62,6 +62,7 @@ _RANGES: dict[str, tuple[float | None, float | None]] = {
     "radar_range": (1, 1000),
     "ram_damage": (0, None),
     "decide_time_budget_ms": (0, None),
+    "bot_storage_quota_kb": (0, 10240),
 }
 
 
@@ -127,6 +128,7 @@ class BattleConfig:
     # --- Mode ---
     comms_enabled: bool = True
     decide_time_budget_ms: float | None = 20.0  # None/0 = unlimited (debugging)
+    bot_storage_quota_kb: int = 200          # per bot class data folder (Robocode: 200 KB)
     bot_isolation: str = "none"              # "process": each bot in its own process
                                              # (hard time limit, parallel turns)
 

@@ -8,3 +8,4 @@ build/
 dist/
 results/
 .DS_Store
+bot_data/

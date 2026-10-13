@@ -24,6 +24,8 @@ Design notes:
   settings): bullet_speed(power), damage(power), gun_cooling_rate, max_velocity...
   It's a copy; changing it changes nothing.
 - `draw` is a DebugCanvas for graphical debugging (Robocode's onPaint).
+- `storage` (Robocode's data directory): small JSON files that survive between
+  battles, per bot class, within a size quota. See terrabots.battle.storage.
 - `colors` (Robocode's setColors): CSS colours for "body", "gun", "radar",
   "bullet" and "scan" (the radar wedge). Set them in on_round_start(); any
   left out use the bot's default colour.
@@ -36,6 +38,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from terrabots.battle.config import BattleConfig
 from terrabots.battle.debug import DebugCanvas
+from terrabots.battle.storage import BotStorage
 from terrabots.world_terrain import CreatureMoveProfile
 
 if TYPE_CHECKING:
@@ -52,6 +55,7 @@ class BattleAgent(abc.ABC):
         self.bot_id: int = -1               # set by the arena before on_round_start()
         self.name: str = type(self).__name__
         self.memory: dict[str, Any] = {}    # replaced by the per-class battle memory
+        self.storage = BotStorage(None, type(self).__name__)   # replaced by the battle's
         self.rules: BattleConfig = BattleConfig()   # replaced by the battle's rules
         self.draw = DebugCanvas()
         self.colors: dict[str, str] = {}

@@ -56,7 +56,8 @@ def spec_of(cls: type) -> str:
 # Child side
 # ---------------------------------------------------------------------------
 
-def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None, cwd: str) -> None:
+def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None, cwd: str,
+                data_dir: str | None = None, quota_kb: int = 200) -> None:
     import os
     import sys
 
@@ -75,6 +76,10 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
         return
     conn.send(("ready", cls.__name__))
     memory: dict[str, Any] = {}
+    from terrabots.battle.runner import storage_key
+    from terrabots.battle.storage import BotStorage
+
+    storage = BotStorage(data_dir, storage_key(cls), quota_kb)
     agent: BattleAgent | None = None
 
     while True:
@@ -88,6 +93,7 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
                 _, bot_id, name, rules, round_number, rounds = msg
                 agent = cls()
                 agent.bot_id, agent.name, agent.memory, agent.rules = bot_id, name, memory, rules
+                agent.storage = storage
                 agent.on_round_start(round_number, rounds)
                 conn.send(("ok", agent.adjust_gun_for_body_turn, agent.adjust_radar_for_gun_turn,
                            agent.profile, agent.colors))
@@ -127,7 +133,8 @@ def _child_main(conn: Connection, spec: str, world: WorldGrid, seed: int | None,
 class ProcessBot(BattleAgent):
     """Arena-facing proxy for a bot running in its own process."""
 
-    def __init__(self, spec: str, world: WorldGrid, seed: int | None) -> None:
+    def __init__(self, spec: str, world: WorldGrid, seed: int | None,
+                 data_dir: str | None = None, quota_kb: int = 200) -> None:
         super().__init__()
         import os
 
@@ -135,7 +142,7 @@ class ProcessBot(BattleAgent):
         self.class_name = spec.rpartition(":")[2]
         ctx = mp.get_context("spawn")   # safe with the viewer's threads; same on every OS
         self._conn, child = ctx.Pipe()
-        self._proc = ctx.Process(target=_child_main, args=(child, spec, world, seed, os.getcwd()),
+        self._proc = ctx.Process(target=_child_main, args=(child, spec, world, seed, os.getcwd(), data_dir, quota_kb),
                                  daemon=True, name=f"bot:{spec}")
         self._proc.start()
         child.close()
@@ -240,9 +247,11 @@ class ProcessBot(BattleAgent):
         self._conn.close()
 
 
-def start_bots(specs: list[str], world: WorldGrid, config: BattleConfig) -> list[ProcessBot]:
+def start_bots(specs: list[str], world: WorldGrid, config: BattleConfig,
+               data_dir: str | None = None) -> list[ProcessBot]:
     """Start one process per bot in parallel and wait until all have loaded."""
-    bots = [ProcessBot(spec, world, None if config.seed is None else config.seed + i)
+    bots = [ProcessBot(spec, world, None if config.seed is None else config.seed + i,
+                       data_dir, config.bot_storage_quota_kb)
             for i, spec in enumerate(specs)]
     try:
         for b in bots:

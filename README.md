@@ -309,9 +309,9 @@ a bot is added). Current top three:
 
 | 1v1 (APS) | Melee (share of points) | Survival (avg. lifetime) |
 |---|---|---|
-| 1. Learner 74.9 | 1. Crazy 176 % | 1. LevyForager 220 |
-| 2. Crazy 73.1 | 2. FirstTank 139 % | 2. Grazer 205 |
-| 3. SquadLeader 68.1 | 3. SquadLeader 137 % | 3. Sharer 171 |
+| 1. MuBot 85.2 | 1. MuBot 175 % | 1. LevyForager 183 |
+| 2. Learner 70.1 | 2. Crazy 152 % | 2. Grazer 169 |
+| 3. Crazy 68.4 | 3. FirstTank 125 % | 3. MuBotSurvival 154 |
 
 Full tables: [docs/leaderboard.md](docs/leaderboard.md). **Put yours on the
 board.** Your code stays private unless you choose to publish it: share a private

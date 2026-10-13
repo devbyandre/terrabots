@@ -281,7 +281,46 @@ def main() -> None:
             return
     (a.out / "leaderboard.json").write_text(json.dumps(board, indent=1) + "\n")
     (a.out / "leaderboard.md").write_text(markdown(board))
+    if a.out.resolve() == (ROOT / "docs").resolve():
+        update_snapshots(board)
     print(markdown(board))
+
+
+def update_snapshots(board: dict) -> None:
+    """The README's top-3 table and the website's tables (shown until the page has
+    loaded leaderboard.json) follow the leaderboard."""
+    import re
+
+    o, m, s = board["one_v_one"], board["melee"], board["survival"]
+    readme = ROOT / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    head = "| 1v1 (APS) | Melee (share of points) | Survival (avg. lifetime) |"
+    if head in text:
+        start = text.index(head)
+        end = text.index("\n\n", start)
+        rows = [head, "|---|---|---|"] + [
+            f"| {i + 1}. {o[i]['name']} {o[i]['aps']:.1f} | {i + 1}. {m[i]['name']} {m[i]['share']:.0f} % "
+            f"| {i + 1}. {s[i]['name']} {s[i]['avg_lifetime']:.0f} |" for i in range(min(3, len(o), len(m), len(s)))]
+        readme.write_text(text[:start] + "\n".join(rows) + text[end:], encoding="utf-8")
+
+    page = ROOT / "docs" / "index.html"
+    html = page.read_text(encoding="utf-8")
+
+    def body(items, fmt):
+        out = []
+        for e in items[:6]:
+            top = ' class="top"' if e["rank"] == 1 else ""
+            tag = f'<span class="tag">{e["origin"]}</span>' if e["origin"] != "demo" else ""
+            out.append(f'            <tr{top}><td class="rk">{e["rank"]}</td><td class="nm">{e["name"]}{tag}</td>'
+                       f'<td class="r">{fmt(e)}</td></tr>')
+        return "\n".join(out)
+
+    for tid, items, fmt in (("lb-1v1", o, lambda e: f'{e["aps"]:.1f}'), ("lb-melee", m, lambda e: f'{e["share"]:.0f} %'),
+                            ("lb-survival", s, lambda e: f'{e["avg_lifetime"]:.0f}')):
+        html = re.sub(rf'(<tbody id="{tid}">\n).*?(\n          </tbody>)',
+                      lambda mm: mm.group(1) + body(items, fmt) + mm.group(2), html, flags=re.S)
+    html = re.sub(r"Generated \d{4}-\d{2}-\d{2} by", f"Generated {board['generated']} by", html)
+    page.write_text(html, encoding="utf-8")
 
 
 def markdown(board: dict) -> str:

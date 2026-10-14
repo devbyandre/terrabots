@@ -225,6 +225,8 @@ public final class _Peer {
         } catch (InterruptedException e) {
             throw new RoundOver();
         }
+        // A death or round end happens during the next turn; Robocode stamps it with that turn.
+        if (t == DEATH_SIGNAL || t instanceof End) time++;
         if (t == DEATH_SIGNAL) {
             deliver(new DeathEvent());
             awaitEnd();
@@ -303,6 +305,7 @@ public final class _Peer {
         others = (int) num(obs, "others");
         fieldW = num(obs, "arena_width") * PX;
         fieldH = num(obs, "arena_height") * PX;
+        boolean hasPrev = hasStatus;
         if (hasStatus) updateRemaining(h0, g0, r0);
         hasStatus = true;
 
@@ -341,7 +344,8 @@ public final class _Peer {
             double from = num(e, "bearing");
             Bullet b = new Bullet(Utils.normalAbsoluteAngleDegrees(from + 180), num(e, "x") * PX, num(e, "y") * PX,
                     power, nameOf((int) num(e, "shooter_id")), name, false, -1);
-            add(new HitByBulletEvent(rel(from), b));
+            // Bullets hit before robots turn: the bearing is from the heading before this turn's turn.
+            add(new HitByBulletEvent(Utils.normalRelativeAngleDegrees(from - (hasPrev ? h0 : heading)), b));
         }
         for (Map<String, Object> e : list(obs, "hit_bot")) {
             int id = (int) num(e, "bot_id");
@@ -401,7 +405,7 @@ public final class _Peer {
     }
 
     RobotStatus status() {
-        return new RobotStatus(x, y, energy, heading, gunHeading, radarHeading, velocity, gunHeat,
+        return new RobotStatus(x, y, currentEnergy(), heading, gunHeading, radarHeading, velocity, currentGunHeat(),
                 distance, bodyTurn, gunTurn, radarTurn, others, roundNum, numRounds, time);
     }
 
@@ -516,8 +520,13 @@ public final class _Peer {
         return lo;
     }
 
+    /** As in Robocode, a shot queued this turn already shows in energy and gun heat. */
+    double currentEnergy() { return energy - fire; }
+
+    double currentGunHeat() { return fire > 0 ? gunHeat + Rules.getGunHeat(fire) : gunHeat; }
+
     Bullet queueFire(double power) {
-        if (gunHeat > 0 || power <= 0 || energy <= 0) return null;
+        if (currentGunHeat() > 0 || power <= 0 || currentEnergy() <= 0) return null;
         power = Math.min(Math.max(power, Rules.MIN_BULLET_POWER), Math.min(Rules.MAX_BULLET_POWER, energy));
         fire = power;
         Bullet b = new Bullet(gunHeading, x, y, power, name, null, true, time);

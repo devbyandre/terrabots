@@ -148,19 +148,26 @@ def in_radar_arc(body: BattleBody, tx: float, ty: float, radius: float,
                  radar_range: float) -> bool:
     """Is a body of `radius` (its half width) at (tx, ty) inside the arc swept this tick?
 
-    The arc runs from radar_prev by radar_sweep degrees. The target's angular size is
+    The arc runs from radar_prev by radar_sweep degrees. The target's angular size (its
+    square's corners, as Robocode's arc-meets-bounding-box test) is
     added on both sides, so a radar that didn't turn still sees a bot it points
     straight at (needed for a locked radar).
     """
     d = distance(body.x, body.y, tx, ty)
     if d > radar_range + radius:
         return False
-    if d <= radius:
+    if d <= radius * math.sqrt(2):
         return True
-    half_width = math.degrees(math.asin(min(1.0, radius / d)))
-    rel = normalize_angle(heading_to(body.x, body.y, tx, ty) - body.radar_prev)
+    # The target is an axis-aligned square (as in Robocode, whose radar arc must
+    # touch the bot's bounding box): its angular extent spans its corners.
+    # Corners relative to the target's centre first, so a target behind the sweep
+    # (near +-180 degrees) can't wrap around into it.
+    centre = heading_to(body.x, body.y, tx, ty)
+    rel = normalize_angle(centre - body.radar_prev)
+    offsets = [normalize_angle(heading_to(body.x, body.y, tx + sx * radius, ty + sy * radius) - centre)
+               for sx in (-1, 1) for sy in (-1, 1)]
     lo, hi = min(0.0, body.radar_sweep), max(0.0, body.radar_sweep)
-    return lo - half_width <= rel <= hi + half_width
+    return rel + min(offsets) <= hi and rel + max(offsets) >= lo
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +184,7 @@ class Bullet:
     heading: float
     power: float
     speed: float
+    line: tuple[float, float, float, float] | None = None   # its last move (x0, y0, x1, y1)
 
 
 def segment_box_t(x0: float, y0: float, x1: float, y1: float,
@@ -228,10 +236,15 @@ def segments_intersect_t(a0: tuple[float, float], a1: tuple[float, float],
     return t if 0 <= t <= 1 and 0 <= u <= 1 else None
 
 
+BULLET_RADIUS = 3 / 16     # cells; Robocode's bullet radius (3 px), for the arena edge
+
+
 def terrain_block_t(x0: float, y0: float, x1: float, y1: float, z: float,
                     world: WorldGrid, step: float = 0.2) -> tuple[float, str] | None:
-    """First t along the segment where the bullet leaves the arena or hits ground
-    higher than its flight height. Same rule as LOS: terrain blocks by elevation.
+    """First t along the segment where the bullet hits ground higher than its flight
+    height (same rule as LOS: terrain blocks by elevation), or leaves the arena.
+    Robocode's rule for the arena edge: a bullet is gone once the end of its step is
+    within BULLET_RADIUS of the edge (or beyond); then t = 1, the end of the step.
     """
     length = distance(x0, y0, x1, y1)
     n = max(1, math.ceil(length / step))
@@ -240,9 +253,12 @@ def terrain_block_t(x0: float, y0: float, x1: float, y1: float, z: float,
         x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
         cx, cy = math.floor(x), math.floor(y)
         if not world.in_bounds(cx, cy):
-            return t, "arena"
+            break
         if world.elevation_map[cx, cy] > z:
             return t, "terrain"
+    r = BULLET_RADIUS
+    if not (r < x1 < world.width - r and r < y1 < world.height - r):
+        return 1.0, "arena"
     return None
 
 

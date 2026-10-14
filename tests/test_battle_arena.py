@@ -114,7 +114,8 @@ def test_gun_heat_blocks_second_shot() -> None:
                        [(5.5, 10.5, 0, 0), (15.5, 10.5, 0, 0)])
     arena.step()
     assert arena.scorer.scores[0].shots == 1
-    assert arena.slots[0].body.gun_heat == pytest.approx(1 + 3 / 5)
+    # Robocode fires, then cools in the same turn: 1 + p/5 - cooling
+    assert arena.slots[0].body.gun_heat == pytest.approx(1 + 3 / 5 - 0.1)
     for _ in range(10):
         arena.step()
     assert arena.scorer.scores[0].shots == 1  # 1.6 heat / 0.1 per tick = 16 ticks
@@ -259,7 +260,8 @@ def test_bullet_collisions_can_be_switched_off() -> None:
 def test_inactivity_drains_everyone_after_quiet_period() -> None:
     arena = make_arena(WorldGrid(30, 30), [Duck(), Duck()],
                        [(5.5, 5.5, 0, 0), (25.5, 25.5, 0, 0)], inactivity_time=10)
-    for _ in range(10):
+    # As in Robocode (checked with a probe): no drain for inactivity_time + 1 ticks.
+    for _ in range(11):
         arena.step()
     assert arena.slots[0].body.energy == 100
     for _ in range(5):

@@ -34,8 +34,8 @@ public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEven
     public double getHeading() { return peer.heading; }
     public double getGunHeading() { return peer.gunHeading; }
     public double getRadarHeading() { return peer.radarHeading; }
-    public double getEnergy() { return peer.energy; }
-    public double getGunHeat() { return peer.gunHeat; }
+    public double getEnergy() { return peer.currentEnergy(); }
+    public double getGunHeat() { return peer.currentGunHeat(); }
     public double getGunCoolingRate() { return peer.coolingRate; }
     public double getVelocity() { return peer.velocity; }
     public double getBattleFieldWidth() { return peer.fieldW; }

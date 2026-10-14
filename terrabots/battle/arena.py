@@ -4,15 +4,19 @@ Arena: runs one battle round, tick by tick.
 Tick order follows Robocode's processing loop (RoboWiki: Robocode/Game_Physics),
 with all bots deciding on the same pre-tick state as in survival mode:
   1. Build each bot's observation (its state + events from last tick) and call decide()
-  2. Move bullets, including the ones fired last tick; resolve hits on bodies,
-     bullet-bullet collisions, terrain and arena misses
-  3. Cool guns, then fire (the bullet leaves along the gun heading *before* this
-     tick's turn, and first moves next tick)
+  2. Fire: guns at heat 0 shoot along the gun heading *before* this tick's turn,
+     from where the bot stands before it moves
+  3. Move bullets, the new ones included (a bullet makes its first step in the
+     tick it's fired); resolve hits on bodies, bullet-bullet collisions, terrain
+     and arena misses
+  3b. Cool guns
   4. Turn gun, radar and body
   5. Accelerate and move bodies; resolve terrain/arena walls and rams
   6. Radar sweeps -> ScannedBot events
   7. Inactivity drain, deaths, scoring, comms delivery
 Events produced in steps 2-7 reach bots in the next tick's observation.
+The order of 2-3b, the inactivity timing and the radar's square bodies were
+checked against Robocode 1.11 with a probe bot logging every tick in both engines.
 
 Teams: each bot has a team (agent.team; None = alone). The round ends when only
 one team is standing. Friendly fire hurts but scores nothing (see scoring.py).
@@ -122,6 +126,7 @@ class Arena:
         self._visibility = VisibilityMgr(world)
         self._comms = CommsMgr(self._visibility)
         self._bullets: list[Bullet] = []
+        self._rng = rng                                  # also Robocode's random bullet/robot order
         self._next_bullet_id = 0
         self._frame_events: list[dict[str, Any]] = []
         self._ticks_since_damage = 0
@@ -191,9 +196,11 @@ class Arena:
             s.events = _empty_events()
         self._comms.clear()
 
+        for s in standing:
+            self._fire(s, actions[s.body.bot_id])
         self._move_bullets()
         for s in standing:
-            self._cool_and_fire(s, actions[s.body.bot_id])
+            s.body.gun_heat = max(0.0, s.body.gun_heat - self.cfg.gun_cooling_rate)
         for s in standing:
             a = actions[s.body.bot_id]
             if s.body.state == ALIVE:
@@ -225,7 +232,9 @@ class Arena:
     def _decide_all(self, standing: list[_Slot]) -> dict[int, BattleAction]:
         """Ask every active bot for its action. Bots in their own process all get
         their observation first and think in parallel; then answers are collected."""
-        active = [s for s in standing if s.body.state == ALIVE and not s.switched_off]
+        # Disabled bots (0 energy) keep running their code, as in Robocode; the arena
+        # ignores what they ask for.
+        active = [s for s in standing if s.body.state in (ALIVE, DISABLED) and not s.switched_off]
         self._skipped_before = {s.body.bot_id: s.skipped_turns for s in active}
         for s in standing:
             s.drawings = []
@@ -307,9 +316,8 @@ class Arena:
     # Bullets
     # ------------------------------------------------------------------
 
-    def _cool_and_fire(self, s: _Slot, a: BattleAction) -> None:
+    def _fire(self, s: _Slot, a: BattleAction) -> None:
         b = s.body
-        b.gun_heat = max(0.0, b.gun_heat - self.cfg.gun_cooling_rate)
         if b.state != ALIVE or a.fire <= 0 or b.gun_heat > 0:
             return
         # Power is capped by remaining energy, so a bot can shoot itself down to
@@ -331,62 +339,75 @@ class Arena:
             bullet.bullet_id, bullet.x, bullet.y, bullet.heading, power, bullet.speed))
 
     def _move_bullets(self) -> None:
+        """Robocode's bullet update (BulletPeer.update), one bullet after another in
+        random order: move; the arena edge first; then the first robot its path
+        touches (robots in random order); then other bullets, each by its latest
+        path: this tick's if it has moved already, last tick's if not (a bullet fired
+        this tick that hasn't moved yet can't be hit). Terrain, which Robocode
+        doesn't have, stops a bullet where its path meets the ground."""
         half = self.cfg.body_half_width
-        paths = {bl.bullet_id: (bl.x, bl.y, *bullet_next(bl)) for bl in self._bullets}
         gone: set[int] = set()
-
-        if self.cfg.bullet_collisions:
-            for i, a in enumerate(self._bullets):
-                for b in self._bullets[i + 1:]:
-                    if a.bullet_id in gone or b.bullet_id in gone or a.shooter_id == b.shooter_id:
-                        continue
-                    pa, pb = paths[a.bullet_id], paths[b.bullet_id]
-                    t = segments_intersect_t(pa[:2], pa[2:], pb[:2], pb[2:])
-                    if t is None:
-                        continue
-                    gone |= {a.bullet_id, b.bullet_id}
-                    for mine, other in ((a, b), (b, a)):
-                        shooter = self.slots.get(mine.shooter_id)
-                        if shooter is not None:
-                            m, o = paths[mine.bullet_id], paths[other.bullet_id]
-                            shooter.events["bullet_hit_bullet"].append(BulletHitBullet(
-                                mine.bullet_id, other.bullet_id, other.shooter_id, m[2], m[3],
-                                other.heading, other.power, o[2], o[3]))
-                    self._frame_events.append({
-                        "type": "bullet_hit_bullet", "bullets": [a.bullet_id, b.bullet_id],
-                        "x": round(pa[0] + (pa[2] - pa[0]) * t, 3),
-                        "y": round(pa[1] + (pa[3] - pa[1]) * t, 3), "z": round(a.z, 3)})
-
-        remaining: list[Bullet] = []
-        for bullet in self._bullets:
+        order = list(self._bullets)
+        self._rng.shuffle(order)
+        for bullet in order:
             if bullet.bullet_id in gone:
                 continue
-            x0, y0, nx, ny = paths[bullet.bullet_id]
-            hit_t, hit_slot = math.inf, None
-            for s in self.standing():
-                if s.body.bot_id == bullet.shooter_id:
-                    continue
-                t = segment_box_t(x0, y0, nx, ny, s.body.x, s.body.y, half)
-                if t is not None and t < hit_t:
-                    hit_t, hit_slot = t, s
+            x0, y0 = bullet.x, bullet.y
+            nx, ny = bullet_next(bullet)
+            bullet.line = (x0, y0, nx, ny)
+            bullet.x, bullet.y = nx, ny
             block = terrain_block_t(x0, y0, nx, ny, bullet.z, self.world)
+            if block is not None and block[1] == "arena":
+                self._bullet_missed(bullet, x0, y0, nx, ny, block[0], "arena")
+                gone.add(bullet.bullet_id)
+                continue
+            robots = [s for s in self.standing() if s.body.bot_id != bullet.shooter_id]
+            self._rng.shuffle(robots)
+            hit = None
+            for s in robots:
+                t = segment_box_t(x0, y0, nx, ny, s.body.x, s.body.y, half)
+                if t is not None:
+                    hit = (s, t)
+                    break
+            if hit is not None and (block is None or hit[1] <= block[0]):
+                s, t = hit
+                self._bullet_hits(bullet, s, x0 + (nx - x0) * t, y0 + (ny - y0) * t, nx, ny)
+                gone.add(bullet.bullet_id)
+                continue
+            if block is not None:
+                self._bullet_missed(bullet, x0, y0, nx, ny, block[0], block[1])
+                gone.add(bullet.bullet_id)
+                continue
+            if self.cfg.bullet_collisions:
+                for other in self._bullets:
+                    if (other is bullet or other.bullet_id in gone or other.shooter_id == bullet.shooter_id
+                            or other.line is None):
+                        continue
+                    t = segments_intersect_t(bullet.line[:2], bullet.line[2:], other.line[:2], other.line[2:])
+                    if t is None:
+                        continue
+                    gone |= {bullet.bullet_id, other.bullet_id}
+                    for mine, theirs in ((bullet, other), (other, bullet)):
+                        shooter = self.slots.get(mine.shooter_id)
+                        if shooter is not None:
+                            shooter.events["bullet_hit_bullet"].append(BulletHitBullet(
+                                mine.bullet_id, theirs.bullet_id, theirs.shooter_id, mine.x, mine.y,
+                                theirs.heading, theirs.power, theirs.x, theirs.y))
+                    self._frame_events.append({
+                        "type": "bullet_hit_bullet", "bullets": [bullet.bullet_id, other.bullet_id],
+                        "x": round(x0 + (nx - x0) * t, 3), "y": round(y0 + (ny - y0) * t, 3),
+                        "z": round(bullet.z, 3)})
+                    break
+        self._bullets = [b for b in self._bullets if b.bullet_id not in gone]
 
-            if hit_slot is not None and (block is None or hit_t <= block[0]):
-                self._bullet_hits(bullet, hit_slot, x0 + (nx - x0) * hit_t, y0 + (ny - y0) * hit_t, nx, ny)
-            elif block is not None:
-                t, reason = block
-                shooter = self.slots.get(bullet.shooter_id)
-                if shooter is not None:
-                    shooter.events["bullet_missed"].append(BulletMissed(
-                        bullet.bullet_id, bullet.power, reason, x0 + (nx - x0) * t, y0 + (ny - y0) * t))
-                self._frame_events.append({
-                    "type": "bullet_missed", "bullet": bullet.bullet_id, "reason": reason,
-                    "x": round(x0 + (nx - x0) * t, 3), "y": round(y0 + (ny - y0) * t, 3),
-                    "z": round(bullet.z, 3)})
-            else:
-                bullet.x, bullet.y = nx, ny
-                remaining.append(bullet)
-        self._bullets = remaining
+    def _bullet_missed(self, bullet: Bullet, x0: float, y0: float, nx: float, ny: float,
+                       t: float, reason: str) -> None:
+        x, y = x0 + (nx - x0) * t, y0 + (ny - y0) * t
+        shooter = self.slots.get(bullet.shooter_id)
+        if shooter is not None:
+            shooter.events["bullet_missed"].append(BulletMissed(bullet.bullet_id, bullet.power, reason, x, y))
+        self._frame_events.append({"type": "bullet_missed", "bullet": bullet.bullet_id, "reason": reason,
+                                   "x": round(x, 3), "y": round(y, 3), "z": round(bullet.z, 3)})
 
     def _bullet_hits(self, bullet: Bullet, target: _Slot, x: float, y: float, ex: float, ey: float) -> None:
         """(x, y): where it struck, for the viewer; (ex, ey): end of its move this tick, for bots."""
@@ -471,13 +492,18 @@ class Arena:
         """Robocode's stalemate breaker: after inactivity_time ticks without any
         damage, every bot loses inactivity_energy_drain per tick."""
         self._ticks_since_damage += 1
-        if not self.cfg.inactivity_time or self._ticks_since_damage <= self.cfg.inactivity_time:
+        # Robocode drains from the (inactivity_time + 2)nd quiet tick on (its turns count from 0).
+        if not self.cfg.inactivity_time or self._ticks_since_damage <= self.cfg.inactivity_time + 1:
             return
         for s in self.standing():
+            # Robocode: at 0 a bot is disabled first and dies at the next drain.
+            if s.body.state == DISABLED and s.body.energy <= 0:
+                s.body.state = DEAD
+                continue
             s.body.energy -= self.cfg.inactivity_energy_drain
-            if s.body.energy <= 0:
-                s.body.energy, s.body.state = 0.0, DEAD
-        self._ticks_since_damage = self.cfg.inactivity_time + 1  # drain doesn't reset it
+            if s.body.energy <= 1e-9:      # 0.1 steps don't add up to exactly 0 in floating point
+                s.body.energy, s.body.state = 0.0, DISABLED
+        self._ticks_since_damage = self.cfg.inactivity_time + 2  # drain doesn't reset it
 
     # ------------------------------------------------------------------
     # Radar and comms
@@ -578,7 +604,7 @@ class Arena:
             "events": self._frame_events,
             "drawings": {s.body.bot_id: s.drawings for s in self.slots.values() if s.drawings},
             "console": {s.body.bot_id: s.console for s in self.slots.values() if s.console},
-            "inactive": self._ticks_since_damage > self.cfg.inactivity_time > 0,
+            "inactive": self._ticks_since_damage > self.cfg.inactivity_time + 1 > 1,
             "scores": {bid: round(sc.total, 1) for bid, sc in self.scorer.scores.items()},
         }
 

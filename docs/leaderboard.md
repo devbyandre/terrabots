@@ -1,6 +1,6 @@
 # Leaderboard
 
-Generated 2026-10-13 by `tools/tournament.py`. Every battle is seeded; learning bots start with empty storage. Submitted bots play in the [sandbox](sandbox.md); "closed source" bots are private submissions, whose code isn't published. Submit yours: see [CONTRIBUTING.md](../CONTRIBUTING.md#submit-a-bot).
+Generated 2026-10-14 by `tools/tournament.py`. Every battle is seeded; learning bots start with empty storage. Submitted bots play in the [sandbox](sandbox.md); "closed source" bots are private submissions, whose code isn't published. Submit yours: see [CONTRIBUTING.md](../CONTRIBUTING.md#submit-a-bot).
 
 ## 1v1
 
@@ -8,17 +8,17 @@ Every pair, maps flat, twin-hills, ridge, fortress, 2 seeds x 10 rounds. APS = a
 
 | # | Bot | APS | Rounds won | From |
 |---|---|---|---|---|
-| 1 | MuBot | 85.2 | 90.2 % | devbyandre (closed source) |
-| 2 | Learner | 70.1 | 70.1 % | demo |
-| 3 | Crazy | 68.4 | 66.8 % | demo |
-| 4 | SquadLeader | 63.9 | 63.1 % | demo |
-| 5 | SpinBot | 59.0 | 55.1 % | demo |
-| 6 | FirstTank | 52.9 | 56.8 % | template |
-| 7 | Tracker | 41.6 | 43.1 % | demo |
-| 8 | Corners | 39.3 | 36.1 % | demo |
-| 9 | RamFire | 35.5 | 23.0 % | demo |
-| 10 | Walls | 26.7 | 21.0 % | demo |
-| 11 | SittingDuck | 7.4 | 24.6 % | demo |
+| 1 | MuBot | 85.1 | 92.6 % | devbyandre (closed source) |
+| 2 | Crazy | 69.8 | 69.4 % | demo |
+| 3 | Learner | 67.6 | 64.8 % | demo |
+| 4 | SquadLeader | 62.9 | 61.8 % | demo |
+| 5 | SpinBot | 56.8 | 52.2 % | demo |
+| 6 | FirstTank | 54.1 | 56.9 % | template |
+| 7 | Tracker | 43.8 | 44.5 % | demo |
+| 8 | Corners | 39.4 | 37.4 % | demo |
+| 9 | RamFire | 35.0 | 22.5 % | demo |
+| 10 | Walls | 27.6 | 24.1 % | demo |
+| 11 | SittingDuck | 8.0 | 23.9 % | demo |
 
 ## Melee
 
@@ -26,17 +26,17 @@ All bots together, maps flat, lakes, fortress, canyon, procedural, 2 seeds x 10 
 
 | # | Bot | Share | Rounds won | From |
 |---|---|---|---|---|
-| 1 | MuBot | 175.4 % | 46.0 % | devbyandre (closed source) |
-| 2 | Crazy | 152.1 % | 16.0 % | demo |
-| 3 | FirstTank | 125.2 % | 13.0 % | template |
-| 4 | SquadLeader | 124.7 % | 9.0 % | demo |
-| 5 | Learner | 113.1 % | 9.0 % | demo |
-| 6 | SpinBot | 104.0 % | 0.0 % | demo |
-| 7 | Corners | 82.1 % | 5.0 % | demo |
-| 8 | Tracker | 75.2 % | 0.0 % | demo |
-| 9 | Walls | 73.6 % | 1.0 % | demo |
-| 10 | SittingDuck | 39.3 % | 1.0 % | demo |
-| 11 | RamFire | 35.3 % | 0.0 % | demo |
+| 1 | MuBot | 180.2 % | 41.0 % | devbyandre (closed source) |
+| 2 | Crazy | 164.4 % | 20.0 % | demo |
+| 3 | FirstTank | 131.1 % | 20.0 % | template |
+| 4 | SquadLeader | 128.5 % | 9.0 % | demo |
+| 5 | Learner | 94.7 % | 2.0 % | demo |
+| 6 | SpinBot | 89.5 % | 1.0 % | demo |
+| 7 | Corners | 89.4 % | 3.0 % | demo |
+| 8 | Tracker | 82.1 % | 2.0 % | demo |
+| 9 | Walls | 72.2 % | 0.0 % | demo |
+| 10 | SittingDuck | 35.9 % | 2.0 % | demo |
+| 11 | RamFire | 32.1 % | 0.0 % | demo |
 
 ## Survival
 

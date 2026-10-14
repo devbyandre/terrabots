@@ -14,3 +14,4 @@ bot_data/
 submissions/
 # Manifests of packed tournament drives (tools/airgap)
 .airgap/
+.cache/

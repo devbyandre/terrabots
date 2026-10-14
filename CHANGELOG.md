@@ -30,8 +30,17 @@
 - Robocode adapter (`adapters/robocode`, docs/robocode-bots.md): Robocode jar bots
   run unchanged in a Java sandbox container; `terrabots-battle --headless --jar`.
 - Offline tournament tools (`tools/airgap`, docs/airgap.md).
+- `tools/robocode_conformance/`: runs a probe bot in real Robocode and in Terrabots
+  and diffs their per-tick logs.
 
 ### Changed
+- Battle physics now follow Robocode exactly where a probe found differences: guns
+  fire before bullets move and cool after (a new bullet takes its first step in
+  the tick it's fired, and the queued shot no longer lets a bot fire a tick
+  early); bullets resolve one by one in random order, the arena edge (within the
+  3 px bullet radius) before tanks, the first tank touched rather than the nearest;
+  the radar meets the tank's square box; inactivity drains from the 452nd quiet
+  tick and disables a tank at 0 before it dies. Results of seeded battles change.
 - The tournament workflow only checks pull requests (sandboxed, read-only); the
   leaderboard is built by the maintainer, where private submissions are.
 - Process isolation sends the terrain after the bot has started, so a bot that

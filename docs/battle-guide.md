@@ -29,15 +29,19 @@ Every one of them can be changed in the setup screen or a battle file.
 
 1. Every bot gets its observation and decides. All bots decide on the same
    state, nobody sees the others' moves of this tick.
-2. **Bullets move**, including the ones fired last tick, and hit tanks, each other
-   or terrain.
-3. **Guns cool down, then fire.** A bullet leaves along the gun heading *before*
-   this tick's gun turn. (Turn the gun this tick, fire next tick.)
+2. **Guns fire** (at heat 0) along the gun heading *before* this tick's gun turn,
+   from where the tank stands before it moves. (Turn the gun this tick, fire next
+   tick.)
+3. **Bullets move**, the new ones included (a bullet makes its first step in the
+   tick it's fired), and hit tanks, each other, terrain or the arena edge. Then
+   **guns cool down**.
 4. **Gun, radar and body turn.**
 5. **Tanks accelerate and move**; walls, terrain and other tanks stop them.
 6. **Radars sweep** and produce `scanned_bots` for the next tick.
 
 Events from a tick (hits, scans, deaths) arrive in your next observation.
+This order is Robocode's: a probe bot that logs every tick gives identical logs
+in Terrabots and in Robocode 1.11 (`tools/robocode_conformance/`).
 
 ## 3. Physics
 
@@ -58,7 +62,7 @@ Events from a tick (hits, scans, deaths) arrive in your next observation.
 | Wall hit | stops the tank, damage = speed in px/tick × 0.5 − 1 (max 3) | same |
 | Ramming | 0.6 damage to both; a tank driving *away* isn't stopped | same |
 | Bullets crossing | both vanish | same |
-| Inactivity | after 450 ticks without any damage, everyone loses 0.1 energy/tick | same |
+| Inactivity | after 450 ticks without any damage, everyone loses 0.1 energy/tick; at 0 a tank is disabled, then dies at the next drain | same |
 | Zero energy | disabled (can't move or fire), destroyed by the next damage | same |
 
 **Two numbers worth remembering:**

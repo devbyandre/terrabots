@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-13",
- "seconds": 115,
+ "generated": "2026-10-14",
+ "seconds": 136,
  "settings": {
   "duel_maps": [
    "flat",
@@ -28,26 +28,26 @@
    "spec": "",
    "origin": "devbyandre (closed source)",
    "doc": "",
-   "aps": 85.2,
-   "round_win_pct": 90.2,
+   "aps": 85.1,
+   "round_win_pct": 92.6,
    "rank": 1
-  },
-  {
-   "name": "Learner",
-   "spec": "terrabots.agents.learner:Learner",
-   "origin": "demo",
-   "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
-   "aps": 70.1,
-   "round_win_pct": 70.1,
-   "rank": 2
   },
   {
    "name": "Crazy",
    "spec": "terrabots.agents.crazy:Crazy",
    "origin": "demo",
    "doc": "Random zig-zags; linear-prediction gun.",
-   "aps": 68.4,
-   "round_win_pct": 66.8,
+   "aps": 69.8,
+   "round_win_pct": 69.4,
+   "rank": 2
+  },
+  {
+   "name": "Learner",
+   "spec": "terrabots.agents.learner:Learner",
+   "origin": "demo",
+   "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
+   "aps": 67.6,
+   "round_win_pct": 64.8,
    "rank": 3
   },
   {
@@ -55,8 +55,8 @@
    "spec": "terrabots.agents.squad:SquadLeader",
    "origin": "demo",
    "doc": "Squad leader: spins its radar and reports every enemy to the team.",
-   "aps": 63.9,
-   "round_win_pct": 63.1,
+   "aps": 62.9,
+   "round_win_pct": 61.8,
    "rank": 4
   },
   {
@@ -64,8 +64,8 @@
    "spec": "terrabots.agents.spin_bot:SpinBot",
    "origin": "demo",
    "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
-   "aps": 59.0,
-   "round_win_pct": 55.1,
+   "aps": 56.8,
+   "round_win_pct": 52.2,
    "rank": 5
   },
   {
@@ -73,8 +73,8 @@
    "spec": "bots.first_tank:FirstTank",
    "origin": "template",
    "doc": "Sweeps its gun until the radar sees someone, then aims and fires.",
-   "aps": 52.9,
-   "round_win_pct": 56.8,
+   "aps": 54.1,
+   "round_win_pct": 56.9,
    "rank": 6
   },
   {
@@ -82,8 +82,8 @@
    "spec": "terrabots.agents.tracker:Tracker",
    "origin": "demo",
    "doc": "Radar lock, head-on aim, keeps ~10 cells distance.",
-   "aps": 41.6,
-   "round_win_pct": 43.1,
+   "aps": 43.8,
+   "round_win_pct": 44.5,
    "rank": 7
   },
   {
@@ -91,8 +91,8 @@
    "spec": "terrabots.agents.corners:Corners",
    "origin": "demo",
    "doc": "Camps in its best corner (learned across battles) and sweeps its gun.",
-   "aps": 39.3,
-   "round_win_pct": 36.1,
+   "aps": 39.4,
+   "round_win_pct": 37.4,
    "rank": 8
   },
   {
@@ -100,8 +100,8 @@
    "spec": "terrabots.agents.ram_fire:RamFire",
    "origin": "demo",
    "doc": "Charges the nearest enemy and rams it; weak shots point-blank.",
-   "aps": 35.5,
-   "round_win_pct": 23.0,
+   "aps": 35.0,
+   "round_win_pct": 22.5,
    "rank": 9
   },
   {
@@ -109,8 +109,8 @@
    "spec": "terrabots.agents.walls:Walls",
    "origin": "demo",
    "doc": "Drives along the arena edges, gun pointing inwards; shoots what it sees.",
-   "aps": 26.7,
-   "round_win_pct": 21.0,
+   "aps": 27.6,
+   "round_win_pct": 24.1,
    "rank": 10
   },
   {
@@ -118,8 +118,8 @@
    "spec": "terrabots.agents.sitting_duck:SittingDuck",
    "origin": "demo",
    "doc": "Stands still and does nothing.",
-   "aps": 7.4,
-   "round_win_pct": 24.6,
+   "aps": 8.0,
+   "round_win_pct": 23.9,
    "rank": 11
   }
  ],
@@ -129,8 +129,8 @@
    "spec": "",
    "origin": "devbyandre (closed source)",
    "doc": "",
-   "share": 175.4,
-   "round_win_pct": 46.0,
+   "share": 180.2,
+   "round_win_pct": 41.0,
    "rank": 1
   },
   {
@@ -138,8 +138,8 @@
    "spec": "terrabots.agents.crazy:Crazy",
    "origin": "demo",
    "doc": "Random zig-zags; linear-prediction gun.",
-   "share": 152.1,
-   "round_win_pct": 16.0,
+   "share": 164.4,
+   "round_win_pct": 20.0,
    "rank": 2
   },
   {
@@ -147,8 +147,8 @@
    "spec": "bots.first_tank:FirstTank",
    "origin": "template",
    "doc": "Sweeps its gun until the radar sees someone, then aims and fires.",
-   "share": 125.2,
-   "round_win_pct": 13.0,
+   "share": 131.1,
+   "round_win_pct": 20.0,
    "rank": 3
   },
   {
@@ -156,7 +156,7 @@
    "spec": "terrabots.agents.squad:SquadLeader",
    "origin": "demo",
    "doc": "Squad leader: spins its radar and reports every enemy to the team.",
-   "share": 124.7,
+   "share": 128.5,
    "round_win_pct": 9.0,
    "rank": 4
   },
@@ -165,8 +165,8 @@
    "spec": "terrabots.agents.learner:Learner",
    "origin": "demo",
    "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
-   "share": 113.1,
-   "round_win_pct": 9.0,
+   "share": 94.7,
+   "round_win_pct": 2.0,
    "rank": 5
   },
   {
@@ -174,8 +174,8 @@
    "spec": "terrabots.agents.spin_bot:SpinBot",
    "origin": "demo",
    "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
-   "share": 104.0,
-   "round_win_pct": 0.0,
+   "share": 89.5,
+   "round_win_pct": 1.0,
    "rank": 6
   },
   {
@@ -183,8 +183,8 @@
    "spec": "terrabots.agents.corners:Corners",
    "origin": "demo",
    "doc": "Camps in its best corner (learned across battles) and sweeps its gun.",
-   "share": 82.1,
-   "round_win_pct": 5.0,
+   "share": 89.4,
+   "round_win_pct": 3.0,
    "rank": 7
   },
   {
@@ -192,8 +192,8 @@
    "spec": "terrabots.agents.tracker:Tracker",
    "origin": "demo",
    "doc": "Radar lock, head-on aim, keeps ~10 cells distance.",
-   "share": 75.2,
-   "round_win_pct": 0.0,
+   "share": 82.1,
+   "round_win_pct": 2.0,
    "rank": 8
   },
   {
@@ -201,8 +201,8 @@
    "spec": "terrabots.agents.walls:Walls",
    "origin": "demo",
    "doc": "Drives along the arena edges, gun pointing inwards; shoots what it sees.",
-   "share": 73.6,
-   "round_win_pct": 1.0,
+   "share": 72.2,
+   "round_win_pct": 0.0,
    "rank": 9
   },
   {
@@ -210,8 +210,8 @@
    "spec": "terrabots.agents.sitting_duck:SittingDuck",
    "origin": "demo",
    "doc": "Stands still and does nothing.",
-   "share": 39.3,
-   "round_win_pct": 1.0,
+   "share": 35.9,
+   "round_win_pct": 2.0,
    "rank": 10
   },
   {
@@ -219,7 +219,7 @@
    "spec": "terrabots.agents.ram_fire:RamFire",
    "origin": "demo",
    "doc": "Charges the nearest enemy and rams it; weak shots point-blank.",
-   "share": 35.3,
+   "share": 32.1,
    "round_win_pct": 0.0,
    "rank": 11
   }

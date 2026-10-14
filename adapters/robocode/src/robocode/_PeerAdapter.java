@@ -25,14 +25,14 @@ public final class _PeerAdapter implements ITeamRobotPeer {
 
     @Override public String getName() { return peer.name; }
     @Override public long getTime() { return peer.time; }
-    @Override public double getEnergy() { return peer.energy; }
+    @Override public double getEnergy() { return peer.currentEnergy(); }
     @Override public double getX() { return peer.x; }
     @Override public double getY() { return peer.y; }
     @Override public double getVelocity() { return peer.velocity; }
     @Override public double getBodyHeading() { return Math.toRadians(peer.heading); }
     @Override public double getGunHeading() { return Math.toRadians(peer.gunHeading); }
     @Override public double getRadarHeading() { return Math.toRadians(peer.radarHeading); }
-    @Override public double getGunHeat() { return peer.gunHeat; }
+    @Override public double getGunHeat() { return peer.currentGunHeat(); }
     @Override public double getBattleFieldWidth() { return peer.fieldW; }
     @Override public double getBattleFieldHeight() { return peer.fieldH; }
     @Override public int getOthers() { return peer.others; }

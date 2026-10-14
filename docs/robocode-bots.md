@@ -39,7 +39,13 @@ in Robocode.
   fields surviving the rounds; a crashing bot stands still for the rest of the
   round, and one that hangs gets a fresh container for the next round.
 
-How close is it? A mini-rumble of 24 RoboRumble bots spread over the whole
+How close is it? `tools/robocode_conformance/conformance.py` runs a probe bot in
+real Robocode 1.11 and in Terrabots from the same start and diffs what it logs
+every turn (position, headings, velocity, energy, gun heat, scans, bullet
+events): 0 differences over a whole round. Fights between two bots match until
+two bullets resolve in the same turn, which Robocode does in random order.
+
+A mini-rumble of 24 RoboRumble bots spread over the whole
 ranking (rank 1 to 1151), every pair 1v1 on the 800 × 592 field, 10 rounds each:
 the ranking correlates 0.97 (Spearman) with the official RoboRumble ranking, and
 most bots score within a few points of their official APS.

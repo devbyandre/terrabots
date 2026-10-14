@@ -317,9 +317,9 @@ a bot is added). Current top three:
 
 | 1v1 (APS) | Melee (share of points) | Survival (avg. lifetime) |
 |---|---|---|
-| 1. MuBot 85.2 | 1. MuBot 175 % | 1. LevyForager 183 |
-| 2. Learner 70.1 | 2. Crazy 152 % | 2. Grazer 169 |
-| 3. Crazy 68.4 | 3. FirstTank 125 % | 3. MuBotSurvival 154 |
+| 1. MuBot 85.1 | 1. MuBot 180 % | 1. LevyForager 183 |
+| 2. Crazy 69.8 | 2. Crazy 164 % | 2. Grazer 169 |
+| 3. Learner 67.6 | 3. FirstTank 131 % | 3. MuBotSurvival 154 |
 
 Full tables: [docs/leaderboard.md](docs/leaderboard.md). **Once enough submissions are
 in, we run the competition**; until then the board shows the demo bots and ours. **Put yours on the

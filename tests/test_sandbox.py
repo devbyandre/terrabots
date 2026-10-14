@@ -69,6 +69,16 @@ class Hog(BattleAgent):
         while True:
             blocks.append(bytearray(64 * 1024 * 1024))
 ''',
+    "moody": '''
+class Moody(BattleAgent):
+    """Hangs in round 1, plays normally afterwards."""
+    def on_round_start(self, round_number, rounds):
+        self.hang = round_number == 1
+    def decide(self, obs):
+        while self.hang:
+            pass
+        return BattleAction(gun_turn=20, fire=1.0)
+''',
     "liar": '''
 class Liar(BattleAgent):
     """Sends replies the engine must reject."""
@@ -192,6 +202,17 @@ def test_battle_goes_on_without_misbehaving_bots(root: Path) -> None:
     by = {r["name"]: r for r in results.rows}
     assert by["Honest"]["shots"] > 0
     assert by["Looper"]["skipped_turns"] > 0 and by["Liar"]["skipped_turns"] > 0
+
+
+@needs_docker
+def test_bot_stopped_in_one_round_plays_the_next(root: Path) -> None:
+    from terrabots.agents.sitting_duck import SittingDuck
+
+    cfg = BattleConfig(rounds=2, seed=3, terrain="flat", width=32, height=32, max_ticks_per_round=150)
+    results = BattleRunner(cfg, [(SandboxEntry("submissions.mallory.moody:Moody", root), 1), (SittingDuck, 1)],
+                           time_budget_ms=20).run()
+    moody = next(r for r in results.rows if r["name"] == "Moody")
+    assert moody["shots"] > 0            # round 2, in a fresh container
 
 
 @needs_docker

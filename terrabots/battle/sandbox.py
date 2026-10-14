@@ -54,6 +54,7 @@ from terrabots.world_terrain import WorldGrid
 logger = logging.getLogger(__name__)
 
 IMAGE = "terrabots-sandbox"
+ROBOCODE_IMAGE = "terrabots-sandbox-robocode"   # Java + adapters/robocode, for Robocode jars
 GROUP_ROOTS = ("contrib", "submissions")   # <root>/<author>/<bot>.py: one author's folder each
 START_TIMEOUT_S = 60.0
 HARD_TIMEOUT_MIN_S = 2.0
@@ -80,6 +81,39 @@ class SandboxEntry:
         return self.spec.partition(":")[2]
 
 
+@dataclass(frozen=True)
+class JarEntry(SandboxEntry):
+    """A Robocode bot: a jar from the Robocode world (e.g. the RoboRumble), run
+    unchanged through the Terrabots adapter (adapters/robocode). Make them with
+    JarEntry.from_jar(path), which reads the robot class from the jar."""
+    jar: Path = Path()
+
+    @property
+    def class_name(self) -> str:
+        return self.spec.partition(":")[2].rpartition(".")[2]
+
+    @staticmethod
+    def from_jar(path: str | Path) -> list["JarEntry"]:
+        """The robots a jar declares in its .properties files (robot.classname=...)."""
+        import zipfile
+
+        path = Path(path).resolve()
+        if path.is_symlink() or not path.is_file():
+            raise SandboxError(f"{path}: not a jar file")
+        found = []
+        with zipfile.ZipFile(path) as z:
+            for info in z.infolist():
+                if not info.filename.endswith(".properties") or info.file_size > 64 * 1024:
+                    continue
+                for line in z.read(info).decode("latin-1").splitlines():
+                    key, _, value = line.partition("=")
+                    if key.strip() == "robot.classname":
+                        cls = value.strip()
+                        if all(part.isidentifier() for part in cls.split(".")):
+                            found.append(JarEntry(f"robocode:{cls}", path.parent, path))
+        return found
+
+
 # ---------------------------------------------------------------------------
 # Setup checks and the docker command
 # ---------------------------------------------------------------------------
@@ -90,8 +124,9 @@ def check_available(image: str = IMAGE) -> None:
         raise SandboxError("sandboxed bots need Docker (docker not found)")
     r = subprocess.run(["docker", "image", "inspect", image], capture_output=True)
     if r.returncode != 0:
-        raise SandboxError(f"sandbox image {image!r} missing; build it with: "
-                           f"docker build -t {image} -f docker/sandbox.Dockerfile docker/")
+        how = ("-f docker/sandbox-robocode.Dockerfile adapters/robocode/" if image == ROBOCODE_IMAGE
+               else "-f docker/sandbox.Dockerfile docker/")
+        raise SandboxError(f"sandbox image {image!r} missing; build it with: docker build -t {image} {how}")
     # Without kernel support Docker accepts --memory / --pids-limit and silently
     # ignores them (Raspberry Pi OS ships like that), so check instead of trusting.
     r = subprocess.run(["docker", "info", "--format", "{{.MemoryLimit}} {{.PidsLimit}}"],
@@ -127,18 +162,29 @@ def bot_mount(entry: SandboxEntry) -> tuple[Path, str]:
 
 
 def docker_command(entry: SandboxEntry, name: str, quota_kb: int = 200, image: str = IMAGE) -> list[str]:
-    host, inside = bot_mount(entry)
-    engine = Path(terrabots.__file__).resolve().parent
-    return [
+    # RoboRumble clients give Java bots 512 MB of heap; strong bots collect a lot of
+    # statistics across rounds and stall (garbage collection) with less.
+    memory = "1g" if isinstance(entry, JarEntry) else "512m"
+    locked = [
         "docker", "run", "--rm", "-i", "--name", name,
         "--network", "none", "--read-only", "--ipc", "none", "--log-driver", "none",
         "--tmpfs", "/tmp:rw,size=16m,mode=1777",
         "--tmpfs", f"/data:rw,size={quota_kb + 64}k,uid={BOT_UID},gid={BOT_UID},mode=700",
-        "--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--pids-limit", "64",
+        "--memory", memory, "--memory-swap", memory, "--cpus", "1", "--pids-limit", "64",
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--user", f"{BOT_UID}:{BOT_UID}",
-        "-v", f"{engine}:/engine/terrabots:ro", "-v", f"{host}:{inside}:ro",
-        image, "python", "-m", "terrabots.battle.sandbox_child",
     ]
+    if isinstance(entry, JarEntry):
+        # Only the jar itself goes in; the adapter is part of the image.
+        jar = Path(entry.jar).resolve()
+        if Path(entry.jar).is_symlink() or not jar.is_file():
+            raise SandboxError(f"{entry.jar}: not a jar file")
+        return locked + ["-v", f"{jar}:/bot/bot.jar:ro", ROBOCODE_IMAGE,
+                         "java", "-Xmx512m", "-XX:+UseSerialGC", "-XX:-UsePerfData",
+                         "-cp", "/opt/terrabots/adapter.jar:/bot/bot.jar", "terrabots.robocode.Host"]
+    host, inside = bot_mount(entry)
+    engine = Path(terrabots.__file__).resolve().parent
+    return locked + ["-v", f"{engine}:/engine/terrabots:ro", "-v", f"{host}:{inside}:ro",
+                     image, "python", "-m", "terrabots.battle.sandbox_child"]
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +296,14 @@ class SandboxBot(RemoteBot):
         super().__init__()
         self.spec = entry.spec
         self.class_name = entry.class_name
+        self._restart = (entry, world, seed, quota_kb)
         self._ch, self.droid = _start(entry, "battle", world, seed, quota_kb, entry.spec)
+        # Java bots warm up (JIT) and often precompute on their first turn; Robocode
+        # skips their turns rather than stopping them, so they get more headroom.
+        java = isinstance(entry, JarEntry)
+        self.first_turn_s = 30.0 if java else HARD_TIMEOUT_MIN_S
+        self.turn_s = 5.0 if java else HARD_TIMEOUT_MIN_S
+        self._first = True
         self._seq = 0
         self._t0 = 0.0
         self.last_elapsed_ms = 0.0
@@ -262,7 +315,13 @@ class SandboxBot(RemoteBot):
         return self._ch.dead
 
     def on_round_start(self, round_number: int, rounds: int) -> None:
+        if self._ch.dead:
+            # Stopped last round (hung, crashed, too much output): a fresh container,
+            # so one bad round doesn't cost the whole battle. Its memory is lost.
+            entry, world, seed, quota_kb = self._restart
+            self._ch, self.droid = _start(entry, "battle", world, seed, quota_kb, entry.spec)
         self._ch.label = self.name
+        self._first = True
         self._ch.send({"t": "round", "bot_id": self.bot_id, "name": self.name, "rules": self.rules.to_dict(),
                        "round": round_number, "rounds": rounds, "team": self.team, "leader": self.is_leader,
                        "teammates": {str(k): v for k, v in self.teammates.items()}})
@@ -290,7 +349,9 @@ class SandboxBot(RemoteBot):
         self._ch.send({"t": "decide", "seq": self._seq, "obs": wire.battle_obs_out(obs), "console": self.console})
 
     def collect_decide(self, budget_ms: float | None) -> BattleAction:
-        deadline = self._t0 + max(HARD_TIMEOUT_MIN_S, 20 * (budget_ms or 0) / 1000)
+        hard = self.first_turn_s if self._first else self.turn_s
+        self._first = False
+        deadline = self._t0 + max(hard, 20 * (budget_ms or 0) / 1000)
         while True:
             reply = self._ch.recv(deadline - time.perf_counter(), "decide")
             if reply.get("seq") != self._seq:
@@ -321,6 +382,8 @@ def start_sandboxed(entries: list[tuple[int, SandboxEntry]], world: WorldGrid, s
                     quota_kb: int) -> dict[int, SandboxBot]:
     """Start one container per bot id, in parallel."""
     check_available()
+    if any(isinstance(e, JarEntry) for _, e in entries):
+        check_available(ROBOCODE_IMAGE)
     out: dict[int, SandboxBot] = {}
     errors: list[Exception] = []
 

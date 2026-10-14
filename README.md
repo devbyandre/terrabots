@@ -123,6 +123,14 @@ between battles (`bot_data/`, 200 KB quota by default).
 <kbd>D</kbd>. `self.rules` holds the battle's rules (`bullet_speed(power)`,
 `gun_cooling_rate`, ...).
 
+### Robocode bots, unchanged
+
+Robocode `.jar` bots (e.g. from the RoboRumble) fight here as they are: the
+[Robocode adapter](adapters/robocode/) runs each one in a Java sandbox container.
+`terrabots-battle --headless --jar SomeBot.jar --bot terrabots.agents.crazy:Crazy`.
+Details and limits: [docs/robocode-bots.md](docs/robocode-bots.md). No Robocode
+bots are included; their code belongs to their authors.
+
 ### Porting a Robocode bot
 
 `terrabots.battle.robocode.AdvancedRobot` gives you Robocode's API: queued

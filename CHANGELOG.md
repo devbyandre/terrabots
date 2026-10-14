@@ -27,6 +27,10 @@
   published. `tools/tournament.py --extra SPEC@AUTHOR` adds your own closed-source
   bots.
 
+- Robocode adapter (`adapters/robocode`, docs/robocode-bots.md): Robocode jar bots
+  run unchanged in a Java sandbox container; `terrabots-battle --headless --jar`.
+- Offline tournament tools (`tools/airgap`, docs/airgap.md).
+
 ### Changed
 - The tournament workflow only checks pull requests (sandboxed, read-only); the
   leaderboard is built by the maintainer, where private submissions are.

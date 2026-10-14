@@ -44,3 +44,9 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: docker build -t terrabots-sandbox -f docker/sandbox.Dockerfile docker/
       - run: pytest -q tests/test_sandbox.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: docker build -t terrabots-sandbox-robocode -f docker/sandbox-robocode.Dockerfile adapters/robocode/
+      - run: pytest -q tests/test_robocode_adapter.py

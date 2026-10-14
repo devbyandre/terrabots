@@ -10,6 +10,9 @@ terrabots-battle: run a Robocode-style battle, in the browser or headless.
 
 --bot entries replace the file's bots. Results are saved to results/<timestamp>.json/.csv.
 
+A Robocode bot? --jar path/to/bot.jar (headless) runs it unchanged, sandboxed,
+through the Robocode adapter (docs/robocode-bots.md).
+
 Someone else's bot? Run it with --headless --sandbox: every bot that isn't a
 built-in one (terrabots.*) runs in a locked-down Docker container and is never
 imported here (see terrabots.battle.sandbox; needs Docker and the
@@ -50,6 +53,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--seed", type=int, help="override seed")
     p.add_argument("--isolation", choices=["none", "process"],
                    help="run each bot in its own process (overrides the battle file)")
+    p.add_argument("--jar", action="append", default=[], metavar="BOT.jar",
+                   help="headless: a Robocode bot jar to fight, sandboxed (repeatable)")
     p.add_argument("--sandbox", action="store_true",
                    help="headless: run every non-built-in bot in a Docker sandbox (for bots you don't trust)")
     p.add_argument("--no-time-limit", action="store_true",
@@ -92,6 +97,8 @@ def main(argv: list[str] | None = None) -> None:
     bf = load_battle(args)
     budget = None if args.no_time_limit else "config"
 
+    if args.jar and not args.headless:
+        raise SystemExit("terrabots-battle: --jar works with --headless only")
     if args.sandbox and not args.headless:
         raise SystemExit("terrabots-battle: --sandbox works with --headless only (the setup screen "
                          "imports the bots it lists)")
@@ -104,8 +111,16 @@ def main(argv: list[str] | None = None) -> None:
             trusted = not args.sandbox or b.spec.startswith("terrabots.")
             return b if trusted else (SandboxEntry(b.spec), b.count)
 
+        from terrabots.battle.sandbox import JarEntry, SandboxError
+
         try:
-            runner = BattleRunner(bf.config, [place(b) for b in bf.bots], time_budget_ms=budget,
+            jars = [(e, 1) for path in args.jar for e in JarEntry.from_jar(path)[:1]]
+        except (SandboxError, OSError, ValueError) as exc:
+            raise SystemExit(f"terrabots-battle: {exc}") from exc
+        if args.jar and not args.bot and len(jars) + sum(b.count for b in bf.bots) < 2:
+            raise SystemExit("terrabots-battle: add an opponent with --bot")
+        try:
+            runner = BattleRunner(bf.config, [place(b) for b in bf.bots] + jars, time_budget_ms=budget,
                                   data_dir=args.data_dir,
                                   teams=[TeamEntry(t.name, [place(m) for m in t.members]) for t in bf.teams])
         except (ImportError, AttributeError, ValueError, RuntimeError) as exc:

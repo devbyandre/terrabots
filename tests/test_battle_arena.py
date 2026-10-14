@@ -334,3 +334,32 @@ def test_all_demo_bots_play_without_errors(tmp_path) -> None:
     assert all(r["skipped_turns"] == 0 for r in rows)
     assert (tmp_path / "terrabots.agents.corners.Corners" / "corners.json").exists()
     assert (tmp_path / "terrabots.agents.learner.Learner" / "guess_factors.json").exists()
+
+
+def test_bullet_events_report_end_of_tick_positions() -> None:
+    """Robocode's convention, which wave-tracking bots rely on: a bullet's reported
+    position is speed x ticks flown from where it was fired."""
+    import math
+
+    from terrabots.battle.events import BulletHit
+
+    class Recorder(Gunner):
+        def on_round_start(self, round_number: int, rounds: int) -> None:
+            self.hits: list[BulletHit] = []
+            self.fired: dict[int, tuple[float, float, float]] = {}
+
+        def decide(self, obs: BattleObservation) -> BattleAction:
+            for f in obs.bullet_fired:
+                self.fired[f.bullet_id] = (f.x, f.y, f.speed)
+            self.hits += obs.bullet_hit
+            return BattleAction(fire=3.0)
+
+    shooter = Recorder()
+    arena = make_arena(WorldGrid(40, 40), [shooter, Duck()], [(10.5, 10.5, 0, 0), (10.5, 20.3, 0, 0)])
+    for _ in range(30):
+        arena.step()
+    assert shooter.hits
+    hit = shooter.hits[0]
+    x0, y0, speed = shooter.fired[hit.bullet_id]
+    flown = math.hypot(hit.x - x0, hit.y - y0) / speed
+    assert abs(flown - round(flown)) < 1e-9

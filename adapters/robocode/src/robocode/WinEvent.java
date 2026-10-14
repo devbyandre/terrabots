@@ -13,5 +13,5 @@ public class WinEvent extends Event {
     int defaultPriority() { return 100; }
 
     @Override
-    void dispatch(Robot r) { r.onWin(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onWin(this); }
 }

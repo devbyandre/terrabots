@@ -24,5 +24,5 @@ public class HitRobotEvent extends Event {
     int defaultPriority() { return 40; }
 
     @Override
-    void dispatch(Robot r) { r.onHitRobot(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onHitRobot(this); }
 }

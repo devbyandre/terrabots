@@ -348,8 +348,10 @@ class Arena:
                     for mine, other in ((a, b), (b, a)):
                         shooter = self.slots.get(mine.shooter_id)
                         if shooter is not None:
-                            shooter.events["bullet_hit_bullet"].append(
-                                BulletHitBullet(mine.bullet_id, other.bullet_id, other.shooter_id))
+                            m, o = paths[mine.bullet_id], paths[other.bullet_id]
+                            shooter.events["bullet_hit_bullet"].append(BulletHitBullet(
+                                mine.bullet_id, other.bullet_id, other.shooter_id, m[2], m[3],
+                                other.heading, other.power, o[2], o[3]))
                     self._frame_events.append({
                         "type": "bullet_hit_bullet", "bullets": [a.bullet_id, b.bullet_id],
                         "x": round(pa[0] + (pa[2] - pa[0]) * t, 3),
@@ -370,13 +372,13 @@ class Arena:
             block = terrain_block_t(x0, y0, nx, ny, bullet.z, self.world)
 
             if hit_slot is not None and (block is None or hit_t <= block[0]):
-                self._bullet_hits(bullet, hit_slot, x0 + (nx - x0) * hit_t, y0 + (ny - y0) * hit_t)
+                self._bullet_hits(bullet, hit_slot, x0 + (nx - x0) * hit_t, y0 + (ny - y0) * hit_t, nx, ny)
             elif block is not None:
                 t, reason = block
                 shooter = self.slots.get(bullet.shooter_id)
                 if shooter is not None:
-                    shooter.events["bullet_missed"].append(
-                        BulletMissed(bullet.bullet_id, bullet.power, reason))
+                    shooter.events["bullet_missed"].append(BulletMissed(
+                        bullet.bullet_id, bullet.power, reason, x0 + (nx - x0) * t, y0 + (ny - y0) * t))
                 self._frame_events.append({
                     "type": "bullet_missed", "bullet": bullet.bullet_id, "reason": reason,
                     "x": round(x0 + (nx - x0) * t, 3), "y": round(y0 + (ny - y0) * t, 3),
@@ -386,13 +388,14 @@ class Arena:
                 remaining.append(bullet)
         self._bullets = remaining
 
-    def _bullet_hits(self, bullet: Bullet, target: _Slot, x: float, y: float) -> None:
+    def _bullet_hits(self, bullet: Bullet, target: _Slot, x: float, y: float, ex: float, ey: float) -> None:
+        """(x, y): where it struck, for the viewer; (ex, ey): end of its move this tick, for bots."""
         dmg = self.cfg.damage(bullet.power)
         dealt = min(dmg, target.body.energy)
         shooter = self.slots[bullet.shooter_id]
         target.events["hit_by_bullet"].append(HitByBullet(
             bullet.bullet_id, bullet.shooter_id, normalize_heading(bullet.heading + 180),
-            bullet.power, dmg))
+            bullet.power, dmg, ex, ey))
         self.scorer.bullet_hit(bullet.shooter_id, target.body.bot_id, dealt)
         self._damage(target, dmg, attacker=bullet.shooter_id)
         friendly = self.scorer.friends(bullet.shooter_id, target.body.bot_id)
@@ -401,7 +404,7 @@ class Arena:
             if shooter.body.state == DISABLED and shooter.body.energy > 0:
                 shooter.body.state = ALIVE
         shooter.events["bullet_hit"].append(BulletHit(
-            bullet.bullet_id, target.body.bot_id, bullet.power, dmg, max(0.0, target.body.energy)))
+            bullet.bullet_id, target.body.bot_id, bullet.power, dmg, max(0.0, target.body.energy), ex, ey))
         self._frame_events.append({
             "type": "bullet_hit", "bullet": bullet.bullet_id, "shooter": bullet.shooter_id,
             "target": target.body.bot_id, "damage": round(dmg, 2),

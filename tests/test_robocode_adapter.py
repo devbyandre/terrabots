@@ -91,3 +91,23 @@ def test_cli_runs_a_jar(jars, tmp_path, capsys) -> None:
     main(["--headless", "--rounds", "1", "--seed", "3", "--jar", str(jars["Locker"]),
           "--bot", "terrabots.agents.sitting_duck:SittingDuck", "--results-dir", str(tmp_path)])
     assert "Locker" in capsys.readouterr().out
+
+
+def test_robot_objects_from_earlier_rounds_still_control_the_bot(jars) -> None:
+    """Robocode keeps one robot peer per battle; helpers holding the round-1 robot keep working."""
+    from terrabots.agents.sitting_duck import SittingDuck
+
+    cfg = BattleConfig(rounds=3, seed=4, max_ticks_per_round=700, **ROBOCODE_FIELD)
+    rows = {r["name"]: r for r in BattleRunner(cfg, [(entry(jars, "Keeper"), 1), (SittingDuck, 1)],
+                                               time_budget_ms=None).run().rows}
+    assert rows["Keeper"]["firsts"] == 3
+
+
+def test_bot_on_robot_interfaces_only(jars) -> None:
+    """Some top bots implement robocode.robotinterfaces directly and use the peer API."""
+    from terrabots.agents.sitting_duck import SittingDuck
+
+    cfg = BattleConfig(rounds=1, seed=5, max_ticks_per_round=600, **ROBOCODE_FIELD)
+    rows = {r["name"]: r for r in BattleRunner(cfg, [(entry(jars, "Bare"), 1), (SittingDuck, 1)],
+                                               time_budget_ms=None).run().rows}
+    assert rows["Bare"]["hits"] > 5

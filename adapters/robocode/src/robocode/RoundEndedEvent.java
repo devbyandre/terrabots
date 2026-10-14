@@ -20,5 +20,5 @@ public class RoundEndedEvent extends Event {
     int defaultPriority() { return 110; }
 
     @Override
-    void dispatch(Robot r) { r.onRoundEnded(this); }
+    void dispatch(_Peer p) { if (p.basic instanceof robocode.robotinterfaces.IBasicEvents3) ((robocode.robotinterfaces.IBasicEvents3) p.basic).onRoundEnded(this); }
 }

@@ -40,5 +40,5 @@ public class ScannedRobotEvent extends Event {
     int defaultPriority() { return 10; }
 
     @Override
-    void dispatch(Robot r) { r.onScannedRobot(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onScannedRobot(this); }
 }

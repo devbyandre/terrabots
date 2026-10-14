@@ -4,6 +4,11 @@ package robocode;
 public class _Robot {
     _Peer peer;
 
+    /** Robocode calls this before run(); the peer stays the same for the whole battle. */
+    public final void setPeer(robocode.robotinterfaces.peer.IBasicRobotPeer p) {
+        if (p instanceof _PeerAdapter) peer = ((_PeerAdapter) p).peer;
+    }
+
     @Deprecated public double getLife() { return peer.energy; }
     @Deprecated public int getBattleNum() { return 0; }
     @Deprecated public int getNumBattles() { return 1; }

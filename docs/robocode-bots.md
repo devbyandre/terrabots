@@ -30,16 +30,27 @@ in Robocode.
 
 - `Robot` (blocking commands), `AdvancedRobot` (queued commands, custom events,
   `waitFor`, data files), `TeamRobot` (messages: Java objects, serialized),
-  `RateControlRobot`, droids (`robocode.Droid`).
-- Event order and priorities as in Robocode; static fields survive the rounds of
-  a battle; a crashing bot stands still for the rest of the round.
+  `RateControlRobot`, droids (`robocode.Droid`), and bots built directly on
+  `robocode.robotinterfaces` and the peer API.
+- Robocode's semantics that strong bots rely on: one robot peer for the whole
+  battle (objects from earlier rounds keep working), time starting at 0 with a
+  status event before `run()`, event order and priorities, bullet positions at
+  the end of the tick (speed × ticks flown from where they were fired), static
+  fields surviving the rounds; a crashing bot stands still for the rest of the
+  round, and one that hangs gets a fresh container for the next round.
+
+How close is it? A mini-rumble of 24 RoboRumble bots spread over the whole
+ranking (rank 1 to 1151), every pair 1v1 on the 800 × 592 field, 10 rounds each:
+the ranking correlates 0.97 (Spearman) with the official RoboRumble ranking, and
+most bots score within a few points of their official APS.
 - On terrain maps the bots play too, but they don't know about hills: they can
   lose sight of you behind a hill and their bullets can hit the ground.
 
 ## What doesn't (yet)
 
-- Bots built on `robocode.robotinterfaces` without extending `robocode.Robot`,
-  `JuniorRobot`, team `.team` files.
+- `JuniorRobot`, team `.team` files.
+- A few bots still misbehave; one obfuscated top bot, for example, aims about 90°
+  off its target, for reasons not found yet.
 - Drawing (`onPaint`) and bot colours aren't shown in the viewer.
 - Java bots use `Math.random()`, which can't be seeded from outside, so their
   battles aren't exactly repeatable.

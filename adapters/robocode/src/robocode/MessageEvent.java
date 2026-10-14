@@ -17,5 +17,5 @@ public class MessageEvent extends Event {
     int defaultPriority() { return 75; }
 
     @Override
-    void dispatch(Robot r) { if (r instanceof TeamRobot) ((TeamRobot) r).onMessageReceived(this); }
+    void dispatch(_Peer p) { if (p.teamEvents != null) p.teamEvents.onMessageReceived(this); }
 }

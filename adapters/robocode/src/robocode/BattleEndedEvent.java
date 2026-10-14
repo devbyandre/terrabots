@@ -17,5 +17,5 @@ public class BattleEndedEvent extends Event {
     int defaultPriority() { return 100; }
 
     @Override
-    void dispatch(Robot r) { r.onBattleEnded(this); }
+    void dispatch(_Peer p) { if (p.basic instanceof robocode.robotinterfaces.IBasicEvents2) ((robocode.robotinterfaces.IBasicEvents2) p.basic).onBattleEnded(this); }
 }

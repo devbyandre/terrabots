@@ -12,5 +12,5 @@ public class CustomEvent extends Event {
     int defaultPriority() { return condition.getPriority(); }
 
     @Override
-    void dispatch(Robot r) { if (r instanceof AdvancedRobot) ((AdvancedRobot) r).onCustomEvent(this); }
+    void dispatch(_Peer p) { if (p.advanced != null) p.advanced.onCustomEvent(this); }
 }

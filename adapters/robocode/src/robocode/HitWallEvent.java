@@ -15,5 +15,5 @@ public class HitWallEvent extends Event {
     int defaultPriority() { return 30; }
 
     @Override
-    void dispatch(Robot r) { r.onHitWall(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onHitWall(this); }
 }

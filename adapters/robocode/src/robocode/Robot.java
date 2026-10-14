@@ -5,11 +5,20 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.PrintStream;
 
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+
+import robocode.robotinterfaces.IBasicEvents;
 import robocode.robotinterfaces.IBasicEvents3;
+import robocode.robotinterfaces.IInteractiveEvents;
+import robocode.robotinterfaces.IInteractiveRobot;
 import robocode.robotinterfaces.IPaintEvents;
+import robocode.robotinterfaces.IPaintRobot;
 
 /** Robocode's basic Robot: blocking commands (ahead(100) waits until done). */
-public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEvents {
+public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEvents, IInteractiveEvents,
+        IInteractiveRobot, IPaintRobot {
     public PrintStream out = System.err;
     private Graphics2D graphics;
 
@@ -128,4 +137,24 @@ public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEven
     @Override public void onBattleEnded(BattleEndedEvent e) { }
     @Override public void onRoundEnded(RoundEndedEvent e) { }
     @Override public void onPaint(Graphics2D g) { }
+
+    // --- keyboard and mouse: never sent in Terrabots ------------------------------
+    @Override public void onKeyPressed(KeyEvent e) { }
+    @Override public void onKeyReleased(KeyEvent e) { }
+    @Override public void onKeyTyped(KeyEvent e) { }
+    @Override public void onMouseClicked(MouseEvent e) { }
+    @Override public void onMouseEntered(MouseEvent e) { }
+    @Override public void onMouseExited(MouseEvent e) { }
+    @Override public void onMousePressed(MouseEvent e) { }
+    @Override public void onMouseReleased(MouseEvent e) { }
+    @Override public void onMouseMoved(MouseEvent e) { }
+    @Override public void onMouseDragged(MouseEvent e) { }
+    @Override public void onMouseWheelMoved(MouseWheelEvent e) { }
+
+    // --- robot interfaces ------------------------------------------------------------
+    @Override public final void setOut(PrintStream out) { this.out = out; }
+    @Override public final Runnable getRobotRunnable() { return this; }
+    @Override public final IBasicEvents getBasicEventListener() { return this; }
+    @Override public final IInteractiveEvents getInteractiveEventListener() { return this; }
+    @Override public final IPaintEvents getPaintEventListener() { return this; }
 }

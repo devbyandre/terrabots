@@ -14,5 +14,5 @@ public class BulletMissedEvent extends Event {
     int defaultPriority() { return 60; }
 
     @Override
-    void dispatch(Robot r) { r.onBulletMissed(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onBulletMissed(this); }
 }

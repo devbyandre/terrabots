@@ -14,5 +14,5 @@ public class SkippedTurnEvent extends Event {
     int defaultPriority() { return 100; }
 
     @Override
-    void dispatch(Robot r) { if (r instanceof AdvancedRobot) ((AdvancedRobot) r).onSkippedTurn(this); }
+    void dispatch(_Peer p) { if (p.advanced != null) p.advanced.onSkippedTurn(this); }
 }

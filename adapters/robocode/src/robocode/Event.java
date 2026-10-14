@@ -22,5 +22,5 @@ public abstract class Event implements Comparable<Event>, java.io.Serializable {
 
     abstract int defaultPriority();
 
-    abstract void dispatch(Robot r);
+    abstract void dispatch(_Peer p);
 }

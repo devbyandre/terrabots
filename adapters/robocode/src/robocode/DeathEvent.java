@@ -13,5 +13,5 @@ public class DeathEvent extends Event {
     int defaultPriority() { return -1; }
 
     @Override
-    void dispatch(Robot r) { r.onDeath(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onDeath(this); }
 }

@@ -6,9 +6,11 @@ import java.util.Map;
 import java.util.Vector;
 
 import robocode.robotinterfaces.ITeamEvents;
+import robocode.robotinterfaces.ITeamRobot;
 
 /** Robocode's TeamRobot: messages between teammates. */
-public class TeamRobot extends AdvancedRobot implements ITeamEvents {
+public class TeamRobot extends AdvancedRobot implements ITeamEvents, ITeamRobot {
+    @Override public final ITeamEvents getTeamEventListener() { return this; }
     public void broadcastMessage(Serializable message) throws IOException { peer.queueMessage(null, message); }
 
     public void sendMessage(String name, Serializable message) throws IOException {

@@ -14,10 +14,11 @@ import java.util.Map;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 
+import robocode.robotinterfaces.*;
 import robocode.util.Utils;
 
 /**
- * Internal (not Robocode API): one bot's state for one round, and the hand-over
+ * Internal (not Robocode API): one bot's state for a battle, and the hand-over
  * between the engine (host thread) and the bot's own thread.
  *
  * Robocode bots run their own loop in run() and block in execute() until the
@@ -25,6 +26,11 @@ import robocode.util.Utils;
  * thread (applyObs + event dispatch happen there, as in Robocode), and the bot
  * thread hands back its queued commands when it reaches the next execute().
  * Units: the engine works in cells, Robocode in pixels (16 px per cell).
+ *
+ * One peer for the whole battle, as in Robocode: each round gets a new robot
+ * object, but objects from earlier rounds still control the robot (strong bots
+ * keep helpers built in round 1 that hold the round-1 robot). newRound() resets
+ * everything that belongs to a round.
  */
 public final class _Peer {
     public static final double PX = 16.0;
@@ -76,16 +82,59 @@ public final class _Peer {
     final List<Object> outbox = new ArrayList<>();
 
     // Hand-over
-    final SynchronousQueue<Object> toBot = new SynchronousQueue<>();
-    final SynchronousQueue<Map<String, Object>> toHost = new SynchronousQueue<>();
-    Robot robot;
+    SynchronousQueue<Object> toBot = new SynchronousQueue<>();
+    SynchronousQueue<Map<String, Object>> toHost = new SynchronousQueue<>();
+    Object robot;                         // the bot object of this round (any IBasicRobot)
+    IBasicEvents basic;
+    IAdvancedEvents advanced;
+    ITeamEvents teamEvents;
+    Runnable runnable;
+    java.io.PrintStream out = System.err;
+    final _PeerAdapter adapter = new _PeerAdapter(this);
     Thread thread;
     public boolean started;
     volatile boolean broken;
 
-    public void attach(Robot r) {
+    /** Connect a bot object, as Robocode does: setOut, setPeer, then its listeners. */
+    public void attach(IBasicRobot r) {
         robot = r;
-        r.peer = this;
+        r.setOut(out);
+        r.setPeer(adapter);
+        runnable = r.getRobotRunnable();
+        basic = r.getBasicEventListener();
+        advanced = r instanceof IAdvancedRobot ? ((IAdvancedRobot) r).getAdvancedEventListener() : null;
+        teamEvents = r instanceof ITeamRobot ? ((ITeamRobot) r).getTeamEventListener() : null;
+    }
+
+    /** A new round: fresh round state, the new robot object, a new hand-over. */
+    public void newRound(IBasicRobot r, int round) {
+        roundNum = round;
+        hasStatus = false;
+        time = 0;
+        skipped = 0;
+        energy = 100;
+        gunHeat = 0;
+        velocity = 0;
+        distance = bodyTurn = gunTurn = radarTurn = fire = 0;
+        maxVelocity = Rules.MAX_VELOCITY;
+        maxTurnRate = Rules.MAX_TURN_RATE;
+        adjGun = adjRadar = adjRadarRobot = false;
+        velocityRate = turnRate = gunRate = radarRate = null;
+        stopped = null;
+        pending.clear();
+        conditions.clear();
+        currentPriority = Integer.MIN_VALUE;
+        interruptible = false;
+        unconfirmed.clear();
+        bullets.clear();
+        energies.clear();
+        outbox.clear();
+        toBot = new SynchronousQueue<>();
+        toHost = new SynchronousQueue<>();
+        thread = null;
+        started = false;
+        broken = false;
+        attach(r);
     }
 
     // ------------------------------------------------------------------
@@ -138,14 +187,16 @@ public final class _Peer {
 
     private void botMain() {
         try {
-            dispatch();
-            robot.run();
+            // As in Robocode: before run() only the round's first status (time 0; some
+            // bots set up in onStatus at time 0); other events come at the first execute().
+            dispatchStatusOnly();
+            runnable.run();
             while (true) execute();
         } catch (RoundOver over) {
             // round finished
         } catch (Throwable t) {
-            robot.out.println("Robot stopped: " + t);
-            t.printStackTrace(robot.out);
+            out.println("Robot stopped: " + t);
+            t.printStackTrace(out);
             broken = true;
             idle();
         }
@@ -165,7 +216,7 @@ public final class _Peer {
     }
 
     void execute() {
-        if (Thread.currentThread() != thread) return;     // e.g. called from a constructor
+        if (thread == null) return;     // before the round started (e.g. from a constructor)
         Object t;
         try {
             toHost.put(commands());
@@ -206,11 +257,11 @@ public final class _Peer {
     private void deliver(Event e) {
         e.setTime(time);
         try {
-            e.dispatch(robot);
+            e.dispatch(this);
         } catch (RoundOver over) {
             throw over;
         } catch (Throwable t) {
-            t.printStackTrace(robot.out);
+            t.printStackTrace(out);
         }
     }
 
@@ -248,7 +299,7 @@ public final class _Peer {
         velocity = num(obs, "velocity") * PX;
         energy = num(obs, "energy");
         gunHeat = num(obs, "gun_heat");
-        time = (long) num(obs, "tick");
+        time = (long) num(obs, "tick") - 1;     // Robocode counts turns from 0, the engine ticks from 1
         others = (int) num(obs, "others");
         fieldW = num(obs, "arena_width") * PX;
         fieldH = num(obs, "arena_height") * PX;
@@ -272,23 +323,24 @@ public final class _Peer {
         }
         unconfirmed.removeIf(b -> b.firedAt < time - 1);
         for (Map<String, Object> e : list(obs, "bullet_hit_bullet")) {
-            Bullet mine = resolve((int) num(e, "bullet_id"), null);
-            Bullet other = new Bullet(0, 0, 0, 0, nameOf((int) num(e, "other_shooter_id")), null, false, -1);
+            Bullet mine = resolve((int) num(e, "bullet_id"), null, e);
+            Bullet other = new Bullet(num(e, "other_heading"), num(e, "other_x") * PX, num(e, "other_y") * PX,
+                    num(e, "other_power"), nameOf((int) num(e, "other_shooter_id")), null, false, -1);
             add(new BulletHitBulletEvent(mine, other));
         }
         for (Map<String, Object> e : list(obs, "bullet_hit")) {
             int target = (int) num(e, "target_id");
             energies.put(target, num(e, "target_energy"));
-            add(new BulletHitEvent(nameOf(target), num(e, "target_energy"), resolve((int) num(e, "bullet_id"), nameOf(target))));
+            add(new BulletHitEvent(nameOf(target), num(e, "target_energy"), resolve((int) num(e, "bullet_id"), nameOf(target), e)));
         }
         for (Map<String, Object> e : list(obs, "bullet_missed")) {
-            add(new BulletMissedEvent(resolve((int) num(e, "bullet_id"), null)));
+            add(new BulletMissedEvent(resolve((int) num(e, "bullet_id"), null, e)));
         }
         for (Map<String, Object> e : list(obs, "hit_by_bullet")) {
             double power = num(e, "power");
             double from = num(e, "bearing");
-            Bullet b = new Bullet(Utils.normalAbsoluteAngleDegrees(from + 180), x, y, power,
-                    nameOf((int) num(e, "shooter_id")), name, false, -1);
+            Bullet b = new Bullet(Utils.normalAbsoluteAngleDegrees(from + 180), num(e, "x") * PX, num(e, "y") * PX,
+                    power, nameOf((int) num(e, "shooter_id")), name, false, -1);
             add(new HitByBulletEvent(rel(from), b));
         }
         for (Map<String, Object> e : list(obs, "hit_bot")) {
@@ -318,11 +370,13 @@ public final class _Peer {
         pending.add(e);
     }
 
-    private Bullet resolve(int id, String victim) {
+    private Bullet resolve(int id, String victim, Map<String, Object> where) {
         Bullet b = bullets.remove(id);
         if (b == null) b = new Bullet(0, x, y, 0, name, victim, false, -1);
         b.active = false;
         b.victim = victim;
+        b.x = num(where, "x") * PX;
+        b.y = num(where, "y") * PX;
         return b;
     }
 
@@ -391,14 +445,23 @@ public final class _Peer {
             currentPriority = best;
             interruptible = false;
             try {
-                next.dispatch(robot);
+                next.dispatch(this);
             } catch (RoundOver over) {
                 throw over;
             } catch (Throwable t) {
-                t.printStackTrace(robot.out);
+                t.printStackTrace(out);
             } finally {
                 currentPriority = outer;
                 interruptible = outerInterruptible;
+            }
+        }
+    }
+
+    private void dispatchStatusOnly() {
+        for (Event e : new ArrayList<>(pending)) {
+            if (e instanceof StatusEvent) {
+                pending.remove(e);
+                deliver(e);
             }
         }
     }
@@ -479,7 +542,7 @@ public final class _Peer {
             entry.add(data);
             outbox.add(entry);
         } catch (Exception e) {
-            robot.out.println("message not sent: " + e);
+            out.println("message not sent: " + e);
         }
     }
 

@@ -53,6 +53,8 @@ class HitByBullet:
     bearing: float       # direction the bullet came from
     power: float
     damage: float
+    x: float = 0.0       # where the bullet is at the end of the tick (Robocode's convention:
+    y: float = 0.0       # its distance from where it was fired is speed x ticks flown)
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,8 @@ class BulletHit:
     power: float
     damage: float
     target_energy: float  # target's energy after the hit
+    x: float = 0.0        # the bullet's end-of-tick position (see HitByBullet)
+    y: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -69,6 +73,8 @@ class BulletMissed:
     bullet_id: int
     power: float
     reason: str          # "terrain" or "arena"
+    x: float = 0.0       # where it ended
+    y: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -77,6 +83,12 @@ class BulletHitBullet:
     bullet_id: int
     other_bullet_id: int
     other_shooter_id: int
+    x: float = 0.0              # your bullet's end-of-tick position (see HitByBullet)
+    y: float = 0.0
+    other_heading: float = 0.0  # the other bullet: heading, power, end-of-tick position
+    other_power: float = 0.0
+    other_x: float = 0.0
+    other_y: float = 0.0
 
 
 @dataclass(frozen=True)

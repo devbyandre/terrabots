@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import robocode.Droid;
-import robocode.Robot;
+import robocode.robotinterfaces.IBasicRobot;
 import robocode._Peer;
 import robocode.util.Utils;
 
@@ -53,9 +53,8 @@ public final class Host {
         Class<?> cls;
         try {
             cls = Class.forName(className);
-            if (!Robot.class.isAssignableFrom(cls)) {
-                throw new IllegalArgumentException(className + " doesn't extend robocode.Robot "
-                        + "(bots built on robocode.robotinterfaces aren't supported)");
+            if (!IBasicRobot.class.isAssignableFrom(cls)) {
+                throw new IllegalArgumentException(className + " is not a Robocode robot");
             }
         } catch (Throwable t) {
             Map<String, Object> err = msg("error");
@@ -75,11 +74,11 @@ public final class Host {
             String kind = (String) m.get("t");
             switch (kind) {
                 case "round": {
-                    peer = new _Peer();
+                    if (peer == null) peer = new _Peer();     // one for the battle, as in Robocode
                     peer.botId = (int) Json.num(m, "bot_id");
                     peer.name = (String) m.get("name");
                     peer.team = (String) m.get("team");
-                    peer.roundNum = (int) Json.num(m, "round") - 1;
+                    int round = (int) Json.num(m, "round") - 1;
                     peer.numRounds = (int) Json.num(m, "rounds");
                     peer.quotaBytes = quota;
                     Map<Integer, String> mates = new HashMap<>();
@@ -92,8 +91,8 @@ public final class Host {
                     peer.teammates = mates;
                     Map<String, Object> ok = msg("ok");
                     try {
-                        Robot r = (Robot) cls.getDeclaredConstructor().newInstance();
-                        peer.attach(r);
+                        IBasicRobot r = (IBasicRobot) cls.getDeclaredConstructor().newInstance();
+                        peer.newRound(r, round);
                     } catch (Throwable t) {
                         Map<String, Object> err = msg("error");
                         err.put("msg", "can't create " + className + ": " + t);

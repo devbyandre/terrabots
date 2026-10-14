@@ -14,5 +14,5 @@ public class StatusEvent extends Event {
     int defaultPriority() { return 99; }
 
     @Override
-    void dispatch(Robot r) { r.onStatus(this); }
+    void dispatch(_Peer p) { if (p.basic != null) p.basic.onStatus(this); }
 }

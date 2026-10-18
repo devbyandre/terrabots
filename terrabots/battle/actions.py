@@ -24,3 +24,7 @@ class BattleAction:
     radar_turn: float = 0.0   # degrees; clamped to max_radar_turn_deg
     fire: float = 0.0         # bullet power; 0 = don't fire. Ignored while gun is hot.
     shout: Shout | None = None  # message to another bot (needs comms_enabled + LOS)
+    fire_heading: float | None = None   # Robocode's fire assistance, for plain_robot bots only:
+                              # aim straight at a bot scanned this tick (gun and radar aligned)
+    scan: bool = False        # scan this tick even if nothing moves (Robocode's scan()):
+                              # a tank that neither moves nor turns doesn't scan otherwise

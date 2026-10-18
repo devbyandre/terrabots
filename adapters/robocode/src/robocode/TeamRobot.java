@@ -23,7 +23,8 @@ public class TeamRobot extends AdvancedRobot implements ITeamEvents, ITeamRobot 
         return peer.teammates.isEmpty() ? null : peer.teammates.values().toArray(new String[0]);
     }
 
-    public boolean isTeammate(String name) { return peer.teammates.containsValue(name); }
+    /** As in Robocode, a robot counts as its own teammate (checked against Robocode 1.11). */
+    public boolean isTeammate(String name) { return peer.name.equals(name) || peer.teammates.containsValue(name); }
 
     public Vector<MessageEvent> getMessageEvents() {
         Vector<MessageEvent> out = new Vector<>();

@@ -16,18 +16,18 @@ public class _AdvancedRobot extends Robot {
     // --- queued commands ----------------------------------------------------------
     public void setAhead(double distance) { peer.distance = distance; }
     public void setBack(double distance) { peer.distance = -distance; }
-    public void setTurnRight(double degrees) { peer.bodyTurn = degrees; }
-    public void setTurnLeft(double degrees) { peer.bodyTurn = -degrees; }
-    public void setTurnRightRadians(double radians) { peer.bodyTurn = Math.toDegrees(radians); }
-    public void setTurnLeftRadians(double radians) { peer.bodyTurn = -Math.toDegrees(radians); }
-    public void setTurnGunRight(double degrees) { peer.gunTurn = degrees; }
-    public void setTurnGunLeft(double degrees) { peer.gunTurn = -degrees; }
-    public void setTurnGunRightRadians(double radians) { peer.gunTurn = Math.toDegrees(radians); }
-    public void setTurnGunLeftRadians(double radians) { peer.gunTurn = -Math.toDegrees(radians); }
-    public void setTurnRadarRight(double degrees) { peer.radarTurn = degrees; }
-    public void setTurnRadarLeft(double degrees) { peer.radarTurn = -degrees; }
-    public void setTurnRadarRightRadians(double radians) { peer.radarTurn = Math.toDegrees(radians); }
-    public void setTurnRadarLeftRadians(double radians) { peer.radarTurn = -Math.toDegrees(radians); }
+    public void setTurnRight(double degrees) { peer.bodyTurn = Math.toRadians(degrees); }
+    public void setTurnLeft(double degrees) { peer.bodyTurn = -Math.toRadians(degrees); }
+    public void setTurnRightRadians(double radians) { peer.bodyTurn = radians; }
+    public void setTurnLeftRadians(double radians) { peer.bodyTurn = -radians; }
+    public void setTurnGunRight(double degrees) { peer.gunTurn = Math.toRadians(degrees); }
+    public void setTurnGunLeft(double degrees) { peer.gunTurn = -Math.toRadians(degrees); }
+    public void setTurnGunRightRadians(double radians) { peer.gunTurn = radians; }
+    public void setTurnGunLeftRadians(double radians) { peer.gunTurn = -radians; }
+    public void setTurnRadarRight(double degrees) { peer.radarTurn = Math.toRadians(degrees); }
+    public void setTurnRadarLeft(double degrees) { peer.radarTurn = -Math.toRadians(degrees); }
+    public void setTurnRadarRightRadians(double radians) { peer.radarTurn = radians; }
+    public void setTurnRadarLeftRadians(double radians) { peer.radarTurn = -radians; }
     public void setFire(double power) { peer.queueFire(power); }
     public Bullet setFireBullet(double power) { return peer.queueFire(power); }
     public void setMaxVelocity(double velocity) { peer.maxVelocity = Math.min(Rules.MAX_VELOCITY, Math.abs(velocity)); }
@@ -59,12 +59,12 @@ public class _AdvancedRobot extends Robot {
 
     // --- status ---------------------------------------------------------------------
     public double getDistanceRemaining() { return peer.distance; }
-    public double getTurnRemaining() { return peer.bodyTurn; }
-    public double getTurnRemainingRadians() { return Math.toRadians(peer.bodyTurn); }
-    public double getGunTurnRemaining() { return peer.gunTurn; }
-    public double getGunTurnRemainingRadians() { return Math.toRadians(peer.gunTurn); }
-    public double getRadarTurnRemaining() { return peer.radarTurn; }
-    public double getRadarTurnRemainingRadians() { return Math.toRadians(peer.radarTurn); }
+    public double getTurnRemaining() { return Math.toDegrees(peer.bodyTurn); }
+    public double getTurnRemainingRadians() { return peer.bodyTurn; }
+    public double getGunTurnRemaining() { return Math.toDegrees(peer.gunTurn); }
+    public double getGunTurnRemainingRadians() { return peer.gunTurn; }
+    public double getRadarTurnRemaining() { return Math.toDegrees(peer.radarTurn); }
+    public double getRadarTurnRemainingRadians() { return peer.radarTurn; }
     public double getHeadingRadians() { return Math.toRadians(peer.heading); }
     public double getGunHeadingRadians() { return Math.toRadians(peer.gunHeading); }
     public double getRadarHeadingRadians() { return Math.toRadians(peer.radarHeading); }

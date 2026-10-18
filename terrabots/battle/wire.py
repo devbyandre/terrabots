@@ -192,14 +192,16 @@ def shout_out(s: Shout | None) -> dict[str, Any] | None:
 
 def battle_action_out(a: BattleAction) -> dict[str, Any]:
     return {"velocity": a.velocity, "body_turn": a.body_turn, "gun_turn": a.gun_turn,
-            "radar_turn": a.radar_turn, "fire": a.fire, "shout": shout_out(a.shout)}
+            "radar_turn": a.radar_turn, "fire": a.fire, "fire_heading": a.fire_heading,
+            "shout": shout_out(a.shout), "scan": a.scan}
 
 
 def battle_action_in(v: Any) -> BattleAction:
     if not isinstance(v, dict):
         raise WireError("action: expected an object")
     return BattleAction(**{k: number(v.get(k, 0.0), k) for k in ("velocity", "body_turn", "gun_turn", "radar_turn", "fire")},
-                        shout=_shout(v.get("shout")))
+                        fire_heading=None if v.get("fire_heading") is None else number(v["fire_heading"], "fire_heading"),
+                        shout=_shout(v.get("shout")), scan=flag(v.get("scan", False), "scan"))
 
 
 def survival_action_out(a: Action) -> dict[str, Any]:

@@ -42,15 +42,15 @@ public final class _PeerAdapter implements ITeamRobotPeer {
     @Override public int getSentryBorderSize() { return 100; }
     @Override public double getGunCoolingRate() { return peer.coolingRate; }
     @Override public double getDistanceRemaining() { return peer.distance; }
-    @Override public double getBodyTurnRemaining() { return Math.toRadians(peer.bodyTurn); }
-    @Override public double getGunTurnRemaining() { return Math.toRadians(peer.gunTurn); }
-    @Override public double getRadarTurnRemaining() { return Math.toRadians(peer.radarTurn); }
+    @Override public double getBodyTurnRemaining() { return peer.bodyTurn; }
+    @Override public double getGunTurnRemaining() { return peer.gunTurn; }
+    @Override public double getRadarTurnRemaining() { return peer.radarTurn; }
 
     @Override public void execute() { peer.execute(); }
-    @Override public void move(double distance) { peer.distance = distance; while (peer.distance != 0) peer.execute(); }
-    @Override public void turnBody(double radians) { peer.bodyTurn = Math.toDegrees(radians); while (peer.bodyTurn != 0) peer.execute(); }
-    @Override public void turnGun(double radians) { peer.gunTurn = Math.toDegrees(radians); while (peer.gunTurn != 0) peer.execute(); }
-    @Override public void turnRadar(double radians) { peer.radarTurn = Math.toDegrees(radians); while (peer.radarTurn != 0) peer.execute(); }
+    @Override public void move(double distance) { peer.distance = distance; do peer.execute(); while (peer.distance != 0); }
+    @Override public void turnBody(double radians) { peer.bodyTurn = radians; do peer.execute(); while (peer.bodyTurn != 0); }
+    @Override public void turnGun(double radians) { peer.gunTurn = radians; do peer.execute(); while (peer.gunTurn != 0); }
+    @Override public void turnRadar(double radians) { peer.radarTurn = radians; do peer.execute(); while (peer.radarTurn != 0); }
     @Override public Bullet fire(double power) { Bullet b = peer.queueFire(power); peer.execute(); return b; }
     @Override public Bullet setFire(double power) { return peer.queueFire(power); }
     @Override public void setBodyColor(Color color) { }
@@ -65,19 +65,17 @@ public final class _PeerAdapter implements ITeamRobotPeer {
         return graphics;
     }
     @Override public void setDebugProperty(String key, String value) { }
-    /** Robocode: scan again and end the turn; a running onScannedRobot may be interrupted by the new scan. */
-    @Override public void rescan() {
-        boolean was = peer.interruptible;
-        if (peer.currentPriority == 10) peer.interruptible = true;
-        peer.execute();
-        peer.interruptible = was;
-    }
+    /** Robocode: scan again and end the turn; a running onScannedRobot may be restarted by the new scan. */
+    @Override public void rescan() { peer.rescan(); }
 
     @Override public void stop(boolean overwrite) { setStop(overwrite); peer.execute(); }
     @Override public void resume() { setResume(); peer.execute(); }
     @Override public void setAdjustGunForBodyTurn(boolean independent) { peer.adjGun = independent; }
-    @Override public void setAdjustRadarForGunTurn(boolean independent) { peer.adjRadar = independent; }
-    @Override public void setAdjustRadarForBodyTurn(boolean independent) { peer.adjRadarRobot = independent; }
+    @Override public void setAdjustRadarForGunTurn(boolean independent) {
+        peer.adjRadar = independent;
+        if (!peer.adjRadarRobotSet) peer.adjRadarRobot = independent;
+    }
+    @Override public void setAdjustRadarForBodyTurn(boolean independent) { peer.adjRadarRobot = independent; peer.adjRadarRobotSet = true; }
     @Override public boolean isAdjustGunForBodyTurn() { return peer.adjGun; }
     @Override public boolean isAdjustRadarForGunTurn() { return peer.adjRadar; }
     @Override public boolean isAdjustRadarForBodyTurn() { return peer.adjRadarRobot; }
@@ -96,9 +94,9 @@ public final class _PeerAdapter implements ITeamRobotPeer {
         }
     }
     @Override public void setMove(double distance) { peer.distance = distance; }
-    @Override public void setTurnBody(double radians) { peer.bodyTurn = Math.toDegrees(radians); }
-    @Override public void setTurnGun(double radians) { peer.gunTurn = Math.toDegrees(radians); }
-    @Override public void setTurnRadar(double radians) { peer.radarTurn = Math.toDegrees(radians); }
+    @Override public void setTurnBody(double radians) { peer.bodyTurn = radians; }
+    @Override public void setTurnGun(double radians) { peer.gunTurn = radians; }
+    @Override public void setTurnRadar(double radians) { peer.radarTurn = radians; }
     @Override public void setMaxTurnRate(double radians) { peer.maxTurnRate = Math.min(Rules.MAX_TURN_RATE, Math.abs(Math.toDegrees(radians))); }
     @Override public void setMaxVelocity(double velocity) { peer.maxVelocity = Math.min(Rules.MAX_VELOCITY, Math.abs(velocity)); }
     @Override public void waitFor(Condition condition) { while (!condition.test()) peer.execute(); }
@@ -145,7 +143,7 @@ public final class _PeerAdapter implements ITeamRobotPeer {
     @Override public String[] getTeammates() {
         return peer.teammates.isEmpty() ? null : peer.teammates.values().toArray(new String[0]);
     }
-    @Override public boolean isTeammate(String name) { return peer.teammates.containsValue(name); }
+    @Override public boolean isTeammate(String name) { return peer.name.equals(name) || peer.teammates.containsValue(name); }
     @Override public void broadcastMessage(Serializable message) throws IOException { peer.queueMessage(null, message); }
     @Override public void sendMessage(String name, Serializable message) throws IOException {
         for (Map.Entry<Integer, String> e : peer.teammates.entrySet()) {

@@ -9,6 +9,8 @@ import robocode.TeamRobot;
 public class Spotter extends TeamRobot {
     @Override
     public void run() {
+        // Robocode counts a robot as its own teammate; some top bots rely on it.
+        if (!isTeammate(getName())) throw new IllegalStateException("isTeammate(own name) must be true");
         setAdjustRadarForGunTurn(true);
         setTurnRadarRight(Double.POSITIVE_INFINITY);
         while (true) execute();

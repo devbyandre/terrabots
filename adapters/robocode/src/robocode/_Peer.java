@@ -41,6 +41,13 @@ public final class _Peer {
         public End(boolean won) { this.won = won; }
     }
 
+    /** Abandons an interruptible handler when a new event of its priority arrives, so
+     *  it can start again from the top (Robocode's setInterruptible / scan()). */
+    static final class Interrupted extends Error {
+        final int priority;
+        Interrupted(int priority) { super(null, null, false, false); this.priority = priority; }
+    }
+
     /** Unwinds the bot thread at the end of its round (Robocode does the same). */
     static final class RoundOver extends Error {
         RoundOver() { super(null, null, false, false); }
@@ -62,8 +69,11 @@ public final class _Peer {
     boolean hasStatus;
 
     // Queued commands
+    boolean scanRequested;
+    // Remaining turns are in radians, as in Robocode: its float arithmetic decides
+    // on which tick a turn ends, and bots notice a tick's difference.
     double distance, bodyTurn, gunTurn, radarTurn, fire, maxVelocity = Rules.MAX_VELOCITY, maxTurnRate = Rules.MAX_TURN_RATE;
-    boolean adjGun, adjRadar, adjRadarRobot;
+    boolean adjGun, adjRadar, adjRadarRobot, adjRadarRobotSet;
     Double velocityRate, turnRate, gunRate, radarRate;   // RateControlRobot
     double[] stopped;                                   // stop() / resume()
 
@@ -72,6 +82,8 @@ public final class _Peer {
     final List<Condition> conditions = new ArrayList<>();
     final Map<String, Integer> priorities = new HashMap<>();
     int currentPriority = Integer.MIN_VALUE;
+    Event currentEvent;                                 // the handler running now
+    Double fireHeading;                                 // fire assistance (plain Robot)
     boolean interruptible;
 
     // Bullets and the other bots we know
@@ -118,12 +130,14 @@ public final class _Peer {
         distance = bodyTurn = gunTurn = radarTurn = fire = 0;
         maxVelocity = Rules.MAX_VELOCITY;
         maxTurnRate = Rules.MAX_TURN_RATE;
-        adjGun = adjRadar = adjRadarRobot = false;
+        adjGun = adjRadar = adjRadarRobot = adjRadarRobotSet = false;
         velocityRate = turnRate = gunRate = radarRate = null;
         stopped = null;
         pending.clear();
         conditions.clear();
         currentPriority = Integer.MIN_VALUE;
+        currentEvent = null;
+        fireHeading = null;
         interruptible = false;
         unconfirmed.clear();
         bullets.clear();
@@ -177,9 +191,13 @@ public final class _Peer {
         return out;
     }
 
-    public boolean adjustGun() { return adjGun; }
+    /** An AdvancedRobot (Robocode charges only these for hitting a wall). */
+    public boolean isAdvanced() { return advanced != null; }
 
-    public boolean adjustRadar() { return adjRadar || (adjRadarRobot && adjGun); }
+    /** Always false: commands() does the adjusting and sends turns the engine carries along. */
+    public boolean adjustGun() { return false; }
+
+    public boolean adjustRadar() { return false; }
 
     // ------------------------------------------------------------------
     // Bot thread
@@ -221,6 +239,7 @@ public final class _Peer {
         try {
             toHost.put(commands());
             fire = 0;
+            fireHeading = null;
             t = toBot.take();
         } catch (InterruptedException e) {
             throw new RoundOver();
@@ -385,14 +404,7 @@ public final class _Peer {
     }
 
     private void updateRemaining(double h0, double g0, double r0) {
-        double body = Utils.normalRelativeAngleDegrees(heading - h0);
-        double gun = Utils.normalRelativeAngleDegrees(gunHeading - g0);
-        double radar = Utils.normalRelativeAngleDegrees(radarHeading - r0);
-        double ownGun = gun - (adjGun ? 0 : body);
-        double ownRadar = radar - (adjustRadar() ? 0 : gun);
-        bodyTurn = consume(bodyTurn, body);
-        gunTurn = consume(gunTurn, ownGun);
-        radarTurn = consume(radarTurn, ownRadar);
+        // Turns were already counted down in commands(), exactly as Robocode does.
         distance = consume(distance, velocity);
     }
 
@@ -443,19 +455,29 @@ public final class _Peer {
                 }
             }
             if (next == null) return;
+            if (best == currentPriority) {
+                // Same priority as the handler we're inside: it set interruptible, so
+                // abandon it; the frame that called it dispatches this event next.
+                throw new Interrupted(best);
+            }
             pending.remove(next);
             int outer = currentPriority;
+            Event outerEvent = currentEvent;
             boolean outerInterruptible = interruptible;
             currentPriority = best;
+            currentEvent = next;
             interruptible = false;
             try {
                 next.dispatch(this);
+            } catch (Interrupted in) {
+                if (in.priority != best) throw in;
             } catch (RoundOver over) {
                 throw over;
             } catch (Throwable t) {
                 t.printStackTrace(out);
             } finally {
                 currentPriority = outer;
+                currentEvent = outerEvent;
                 interruptible = outerInterruptible;
             }
         }
@@ -470,6 +492,16 @@ public final class _Peer {
         }
     }
 
+    /** Robocode's scan()/rescan(): a turn in which a running onScannedRobot may be restarted. */
+    void rescan() {
+        boolean was = interruptible;
+        Integer p = priorities.get("ScannedRobotEvent");
+        if (currentPriority == (p != null ? p : 10)) interruptible = true;
+        scanRequested = true;     // scan even if nothing moves this turn
+        execute();
+        interruptible = was;
+    }
+
     List<Event> allEvents() {
         return new ArrayList<>(pending);
     }
@@ -479,32 +511,54 @@ public final class _Peer {
     // ------------------------------------------------------------------
 
     Map<String, Object> commands() {
-        double v, body;
+        double v;
         if (velocityRate != null) {
             v = velocityRate;
-            body = turnRate != null ? turnRate : 0;
         } else {
             double rem = Math.abs(distance);
             v = rem < 1e-6 ? 0 : Math.copySign(Math.min(Math.min(Rules.MAX_VELOCITY, maxVelocity), stoppable(rem)), distance);
-            body = Math.max(-maxTurnRate, Math.min(maxTurnRate, bodyTurn));
         }
-        double gun = gunRate != null ? gunRate : gunTurn;
-        double radar = radarRate != null ? radarRate : radarTurn;
-        // "Turn forever" (Double.POSITIVE_INFINITY) is common; the engine needs finite
-        // numbers and limits each turn to the per-tick maximum anyway.
+        // RateControlRobot sets the remaining turns to its rates before every execute().
+        if (turnRate != null) bodyTurn = Math.toRadians(turnRate);
+        if (gunRate != null) gunTurn = Math.toRadians(gunRate);
+        if (radarRate != null) radarTurn = Math.toRadians(radarRate);
+
+        // Robocode's RobotPeer.updateHeading/GunHeading/RadarHeading: the gun always
+        // turns with the body and the radar with the gun; "adjust" takes the carried
+        // turn off the remaining turn instead.
+        double rate = Math.min(Math.toRadians(maxTurnRate),
+                (0.4 + 0.6 * (1 - Math.abs(velocity) / Rules.MAX_VELOCITY)) * Rules.MAX_TURN_RATE_RADIANS);
+        double body = step(bodyTurn, rate);
+        bodyTurn = left(bodyTurn, body, rate);
+        if (adjGun) gunTurn -= body;
+        if (adjRadarRobot) radarTurn -= body;
+        double gun = step(gunTurn, Rules.GUN_TURN_RATE_RADIANS);
+        gunTurn = left(gunTurn, gun, Rules.GUN_TURN_RATE_RADIANS);
+        if (adjRadar) radarTurn -= gun;
+        double radar = step(radarTurn, Rules.RADAR_TURN_RATE_RADIANS);
+        radarTurn = left(radarTurn, radar, Rules.RADAR_TURN_RATE_RADIANS);
+
         Map<String, Object> a = new LinkedHashMap<>();
         a.put("velocity", v / PX);
-        a.put("body_turn", finite(body));
-        a.put("gun_turn", finite(gun));
-        a.put("radar_turn", finite(radar));
+        a.put("body_turn", Math.toDegrees(body));
+        a.put("gun_turn", Math.toDegrees(gun));
+        a.put("radar_turn", Math.toDegrees(radar));
         a.put("fire", fire);
+        a.put("fire_heading", fireHeading);
         a.put("shout", null);
+        a.put("scan", scanRequested);
+        scanRequested = false;
         return a;
     }
 
-    private static double finite(double v) {
-        if (Double.isNaN(v)) return 0;
-        return Math.max(-1e6, Math.min(1e6, v));
+    /** This tick's turn: all that is left if it is less than the rate, else the rate. */
+    private static double step(double remaining, double rate) {
+        if (Double.isNaN(remaining) || remaining == 0) return 0;
+        return Math.abs(remaining) < rate ? remaining : Math.copySign(rate, remaining);
+    }
+
+    private static double left(double remaining, double turned, double rate) {
+        return Double.isNaN(remaining) || Math.abs(remaining) < rate ? 0 : remaining - turned;
     }
 
     /** Fastest speed now that still stops within `remaining`, braking 2 px/tick afterwards. */
@@ -529,7 +583,15 @@ public final class _Peer {
         if (currentGunHeat() > 0 || power <= 0 || currentEnergy() <= 0) return null;
         power = Math.min(Math.max(power, Rules.MIN_BULLET_POWER), Math.min(Rules.MAX_BULLET_POWER, energy));
         fire = power;
-        Bullet b = new Bullet(gunHeading, x, y, power, name, null, true, time);
+        // Robocode's fire assistance (BasicRobotProxy.setFireImpl): a plain Robot that
+        // fires from this turn's onScannedRobot with gun and radar aligned shoots
+        // straight at the scanned robot, whatever the gun's exact heading.
+        fireHeading = null;
+        if (!isAdvanced() && currentEvent instanceof ScannedRobotEvent && currentEvent.getTime() == time
+                && gunHeading == radarHeading) {
+            fireHeading = Utils.normalAbsoluteAngleDegrees(heading + ((ScannedRobotEvent) currentEvent).getBearing());
+        }
+        Bullet b = new Bullet(fireHeading != null ? fireHeading : gunHeading, x, y, power, name, null, true, time);
         unconfirmed.add(b);
         return b;
     }

@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-14",
- "seconds": 136,
+ "generated": "2026-10-18",
+ "seconds": 109,
  "settings": {
   "duel_maps": [
    "flat",
@@ -28,8 +28,8 @@
    "spec": "",
    "origin": "devbyandre (closed source)",
    "doc": "",
-   "aps": 85.1,
-   "round_win_pct": 92.6,
+   "aps": 84.5,
+   "round_win_pct": 91.2,
    "rank": 1
   },
   {
@@ -37,8 +37,8 @@
    "spec": "terrabots.agents.crazy:Crazy",
    "origin": "demo",
    "doc": "Random zig-zags; linear-prediction gun.",
-   "aps": 69.8,
-   "round_win_pct": 69.4,
+   "aps": 70.3,
+   "round_win_pct": 69.2,
    "rank": 2
   },
   {
@@ -46,8 +46,8 @@
    "spec": "terrabots.agents.learner:Learner",
    "origin": "demo",
    "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
-   "aps": 67.6,
-   "round_win_pct": 64.8,
+   "aps": 70.2,
+   "round_win_pct": 67.4,
    "rank": 3
   },
   {
@@ -55,26 +55,26 @@
    "spec": "terrabots.agents.squad:SquadLeader",
    "origin": "demo",
    "doc": "Squad leader: spins its radar and reports every enemy to the team.",
-   "aps": 62.9,
-   "round_win_pct": 61.8,
+   "aps": 63.4,
+   "round_win_pct": 62.2,
    "rank": 4
-  },
-  {
-   "name": "SpinBot",
-   "spec": "terrabots.agents.spin_bot:SpinBot",
-   "origin": "demo",
-   "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
-   "aps": 56.8,
-   "round_win_pct": 52.2,
-   "rank": 5
   },
   {
    "name": "FirstTank",
    "spec": "bots.first_tank:FirstTank",
    "origin": "template",
    "doc": "Sweeps its gun until the radar sees someone, then aims and fires.",
-   "aps": 54.1,
-   "round_win_pct": 56.9,
+   "aps": 57.4,
+   "round_win_pct": 58.0,
+   "rank": 5
+  },
+  {
+   "name": "SpinBot",
+   "spec": "terrabots.agents.spin_bot:SpinBot",
+   "origin": "demo",
+   "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
+   "aps": 56.9,
+   "round_win_pct": 53.2,
    "rank": 6
   },
   {
@@ -82,8 +82,8 @@
    "spec": "terrabots.agents.tracker:Tracker",
    "origin": "demo",
    "doc": "Radar lock, head-on aim, keeps ~10 cells distance.",
-   "aps": 43.8,
-   "round_win_pct": 44.5,
+   "aps": 44.2,
+   "round_win_pct": 44.1,
    "rank": 7
   },
   {
@@ -91,8 +91,8 @@
    "spec": "terrabots.agents.corners:Corners",
    "origin": "demo",
    "doc": "Camps in its best corner (learned across battles) and sweeps its gun.",
-   "aps": 39.4,
-   "round_win_pct": 37.4,
+   "aps": 38.9,
+   "round_win_pct": 36.8,
    "rank": 8
   },
   {
@@ -100,8 +100,8 @@
    "spec": "terrabots.agents.ram_fire:RamFire",
    "origin": "demo",
    "doc": "Charges the nearest enemy and rams it; weak shots point-blank.",
-   "aps": 35.0,
-   "round_win_pct": 22.5,
+   "aps": 34.0,
+   "round_win_pct": 20.8,
    "rank": 9
   },
   {
@@ -109,8 +109,8 @@
    "spec": "terrabots.agents.walls:Walls",
    "origin": "demo",
    "doc": "Drives along the arena edges, gun pointing inwards; shoots what it sees.",
-   "aps": 27.6,
-   "round_win_pct": 24.1,
+   "aps": 26.1,
+   "round_win_pct": 23.2,
    "rank": 10
   },
   {
@@ -118,8 +118,8 @@
    "spec": "terrabots.agents.sitting_duck:SittingDuck",
    "origin": "demo",
    "doc": "Stands still and does nothing.",
-   "aps": 8.0,
-   "round_win_pct": 23.9,
+   "aps": 4.1,
+   "round_win_pct": 23.8,
    "rank": 11
   }
  ],
@@ -129,8 +129,8 @@
    "spec": "",
    "origin": "devbyandre (closed source)",
    "doc": "",
-   "share": 180.2,
-   "round_win_pct": 41.0,
+   "share": 188.5,
+   "round_win_pct": 53.0,
    "rank": 1
   },
   {
@@ -138,8 +138,8 @@
    "spec": "terrabots.agents.crazy:Crazy",
    "origin": "demo",
    "doc": "Random zig-zags; linear-prediction gun.",
-   "share": 164.4,
-   "round_win_pct": 20.0,
+   "share": 158.4,
+   "round_win_pct": 14.0,
    "rank": 2
   },
   {
@@ -147,8 +147,8 @@
    "spec": "bots.first_tank:FirstTank",
    "origin": "template",
    "doc": "Sweeps its gun until the radar sees someone, then aims and fires.",
-   "share": 131.1,
-   "round_win_pct": 20.0,
+   "share": 130.1,
+   "round_win_pct": 13.0,
    "rank": 3
   },
   {
@@ -156,26 +156,26 @@
    "spec": "terrabots.agents.squad:SquadLeader",
    "origin": "demo",
    "doc": "Squad leader: spins its radar and reports every enemy to the team.",
-   "share": 128.5,
-   "round_win_pct": 9.0,
+   "share": 128.7,
+   "round_win_pct": 8.0,
    "rank": 4
-  },
-  {
-   "name": "Learner",
-   "spec": "terrabots.agents.learner:Learner",
-   "origin": "demo",
-   "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
-   "share": 94.7,
-   "round_win_pct": 2.0,
-   "rank": 5
   },
   {
    "name": "SpinBot",
    "spec": "terrabots.agents.spin_bot:SpinBot",
    "origin": "demo",
    "doc": "Circles and spins its gun; fires at anything the radar sweeps.",
-   "share": 89.5,
-   "round_win_pct": 1.0,
+   "share": 99.6,
+   "round_win_pct": 2.0,
+   "rank": 5
+  },
+  {
+   "name": "Learner",
+   "spec": "terrabots.agents.learner:Learner",
+   "origin": "demo",
+   "doc": "Orbits and dodges; aims with a guess-factor gun that learns across battles.",
+   "share": 97.8,
+   "round_win_pct": 4.0,
    "rank": 6
   },
   {
@@ -183,8 +183,8 @@
    "spec": "terrabots.agents.corners:Corners",
    "origin": "demo",
    "doc": "Camps in its best corner (learned across battles) and sweeps its gun.",
-   "share": 89.4,
-   "round_win_pct": 3.0,
+   "share": 79.9,
+   "round_win_pct": 2.0,
    "rank": 7
   },
   {
@@ -192,8 +192,8 @@
    "spec": "terrabots.agents.tracker:Tracker",
    "origin": "demo",
    "doc": "Radar lock, head-on aim, keeps ~10 cells distance.",
-   "share": 82.1,
-   "round_win_pct": 2.0,
+   "share": 74.2,
+   "round_win_pct": 1.0,
    "rank": 8
   },
   {
@@ -201,26 +201,26 @@
    "spec": "terrabots.agents.walls:Walls",
    "origin": "demo",
    "doc": "Drives along the arena edges, gun pointing inwards; shoots what it sees.",
-   "share": 72.2,
+   "share": 70.6,
    "round_win_pct": 0.0,
    "rank": 9
-  },
-  {
-   "name": "SittingDuck",
-   "spec": "terrabots.agents.sitting_duck:SittingDuck",
-   "origin": "demo",
-   "doc": "Stands still and does nothing.",
-   "share": 35.9,
-   "round_win_pct": 2.0,
-   "rank": 10
   },
   {
    "name": "RamFire",
    "spec": "terrabots.agents.ram_fire:RamFire",
    "origin": "demo",
    "doc": "Charges the nearest enemy and rams it; weak shots point-blank.",
-   "share": 32.1,
+   "share": 38.0,
    "round_win_pct": 0.0,
+   "rank": 10
+  },
+  {
+   "name": "SittingDuck",
+   "spec": "terrabots.agents.sitting_duck:SittingDuck",
+   "origin": "demo",
+   "doc": "Stands still and does nothing.",
+   "share": 34.2,
+   "round_win_pct": 3.0,
    "rank": 11
   }
  ],

@@ -176,8 +176,8 @@ the setup screen or a battle TOML.
 | Gun heat | 1 + p/5 per shot, cools 0.1/tick |
 | Radar range | 75 cells (1200 px), needs line of sight |
 | Bodies | 36 × 36 px squares (2.25 cells), axis-aligned |
-| Bullets | move before robots each tick; fly at muzzle height, so terrain higher than that stops them; crossing bullets destroy each other |
-| Walls, rams | stop the tank; wall damage scales with speed, rams deal 0.6 each; a bot moving away isn't stopped |
+| Bullets | move before robots each tick; fly at muzzle height, so terrain higher than that stops them; crossing bullets destroy each other (two on the same line pass, as in Robocode) |
+| Walls, rams | stop the tank touching the wall; wall damage scales with speed, rams deal 0.6 each; a bot moving away isn't stopped |
 | Inactivity | after 450 ticks without damage, everyone loses 0.1 energy per tick |
 
 **New to this?** The [battle guide](docs/battle-guide.md) explains the rules,
@@ -317,9 +317,9 @@ a bot is added). Current top three:
 
 | 1v1 (APS) | Melee (share of points) | Survival (avg. lifetime) |
 |---|---|---|
-| 1. MuBot 85.1 | 1. MuBot 180 % | 1. LevyForager 183 |
-| 2. Crazy 69.8 | 2. Crazy 164 % | 2. Grazer 169 |
-| 3. Learner 67.6 | 3. FirstTank 131 % | 3. MuBotSurvival 154 |
+| 1. MuBot 84.5 | 1. MuBot 188 % | 1. LevyForager 183 |
+| 2. Crazy 70.3 | 2. Crazy 158 % | 2. Grazer 169 |
+| 3. Learner 70.2 | 3. FirstTank 130 % | 3. MuBotSurvival 154 |
 
 Full tables: [docs/leaderboard.md](docs/leaderboard.md). **Once enough submissions are
 in, we run the competition**; until then the board shows the demo bots and ours. **Put yours on the

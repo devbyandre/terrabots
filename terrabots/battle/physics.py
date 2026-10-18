@@ -219,18 +219,10 @@ def segments_intersect_t(a0: tuple[float, float], a1: tuple[float, float],
     sx, sy = b1[0] - b0[0], b1[1] - b0[1]
     denom = rx * sy - ry * sx
     qx, qy = b0[0] - a0[0], b0[1] - a0[1]
-    if abs(denom) < 1e-12:
-        # Parallel. Collinear and overlapping is the head-on case (two bots aiming
-        # straight at each other), which happens all the time.
-        if abs(qx * ry - qy * rx) > 1e-9:
-            return None
-        rr = rx * rx + ry * ry
-        if rr == 0:
-            return None
-        tb0 = (qx * rx + qy * ry) / rr
-        tb1 = ((b1[0] - a0[0]) * rx + (b1[1] - a0[1]) * ry) / rr
-        lo, hi = max(0.0, min(tb0, tb1)), min(1.0, max(tb0, tb1))
-        return lo if lo <= hi else None
+    if denom == 0:
+        # Parallel, even collinear head-on: Robocode's test (BulletPeer.intersect)
+        # divides by this determinant and finds no crossing, so such bullets pass.
+        return None
     t = (qx * sy - qy * sx) / denom
     u = (qx * ry - qy * rx) / denom
     return t if 0 <= t <= 1 and 0 <= u <= 1 else None

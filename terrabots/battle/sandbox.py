@@ -332,6 +332,7 @@ class SandboxBot(RemoteBot):
             self.adjust_gun_for_body_turn = wire.flag(reply.get("adj_gun"), "adj_gun")
             self.adjust_radar_for_gun_turn = wire.flag(reply.get("adj_radar"), "adj_radar")
             self.colors = wire.colors_in(reply.get("colors", {}))
+            self.plain_robot = wire.flag(reply.get("plain_robot", False), "plain_robot")
         except wire.WireError as exc:
             raise BotProcessError(f"{self.name} failed in on_round_start: {exc}") from None
 

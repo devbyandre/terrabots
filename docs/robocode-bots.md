@@ -43,11 +43,17 @@ How close is it? `tools/robocode_conformance/conformance.py` runs a probe bot in
 real Robocode 1.11 and in Terrabots from the same start and diffs what it logs
 every turn (position, headings, velocity, energy, gun heat, scans, bullet
 events): 0 differences over a whole round. Fights between two bots match until
-two bullets resolve in the same turn, which Robocode does in random order.
+two bullets resolve in the same turn, which Robocode does in random order;
+compared with Robocode's own battle recording, MyFirstRobot against Corners
+matches for the whole round (841 turns).
+
+`--samples` plays pairs of Robocode's sample bots for 50 rounds in both engines
+and compares the share of points: all eight pairs agree within 0.02 (mean
+difference 0.008).
 
 A mini-rumble of 24 RoboRumble bots spread over the whole
 ranking (rank 1 to 1151), every pair 1v1 on the 800 × 592 field, 10 rounds each:
-the ranking correlates 0.97 (Spearman) with the official RoboRumble ranking, and
+the ranking correlates 0.96 (Spearman) with the official RoboRumble ranking, and
 most bots score within a few points of their official APS.
 - On terrain maps the bots play too, but they don't know about hills: they can
   lose sight of you behind a hill and their bullets can hit the ground.
@@ -55,12 +61,12 @@ most bots score within a few points of their official APS.
 ## What doesn't (yet)
 
 - `JuniorRobot`, team `.team` files.
-- A few bots still misbehave; one obfuscated top bot, for example, aims about 90°
-  off its target, for reasons not found yet.
 - Drawing (`onPaint`) and bot colours aren't shown in the viewer.
 - Java bots use `Math.random()`, which can't be seeded from outside, so their
   battles aren't exactly repeatable.
-- `setAdjustRadarForRobotTurn` is approximated.
+- Robocode keeps angles in radians and Terrabots in degrees, so sums of angles
+  can differ in the last bits. Bots that test such a sum for exactly 0 can then
+  take a different branch (the sample TrackFire does).
 
 ## Licences
 

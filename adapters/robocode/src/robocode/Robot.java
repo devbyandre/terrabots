@@ -52,22 +52,22 @@ public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEven
     // --- blocking commands --------------------------------------------------
     public void ahead(double distance) {
         peer.distance = distance;
-        while (peer.distance != 0) peer.execute();
+        do peer.execute(); while (peer.distance != 0);
     }
     public void back(double distance) { ahead(-distance); }
     public void turnRight(double degrees) {
-        peer.bodyTurn = degrees;
-        while (peer.bodyTurn != 0) peer.execute();
+        peer.bodyTurn = Math.toRadians(degrees);
+        do peer.execute(); while (peer.bodyTurn != 0);
     }
     public void turnLeft(double degrees) { turnRight(-degrees); }
     public void turnGunRight(double degrees) {
-        peer.gunTurn = degrees;
-        while (peer.gunTurn != 0) peer.execute();
+        peer.gunTurn = Math.toRadians(degrees);
+        do peer.execute(); while (peer.gunTurn != 0);
     }
     public void turnGunLeft(double degrees) { turnGunRight(-degrees); }
     public void turnRadarRight(double degrees) {
-        peer.radarTurn = degrees;
-        while (peer.radarTurn != 0) peer.execute();
+        peer.radarTurn = Math.toRadians(degrees);
+        do peer.execute(); while (peer.radarTurn != 0);
     }
     public void turnRadarLeft(double degrees) { turnRadarRight(-degrees); }
     public void fire(double power) {
@@ -80,7 +80,8 @@ public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEven
         return b;
     }
     public void doNothing() { peer.execute(); }
-    public void scan() { peer.execute(); }
+    /** Scan again; inside onScannedRobot, a robot still in view restarts the handler from the top. */
+    public void scan() { peer.rescan(); }
     public void stop() { stop(false); }
     public void stop(boolean overwrite) {
         if (peer.stopped == null || overwrite) {
@@ -100,8 +101,11 @@ public class Robot extends _Robot implements Runnable, IBasicEvents3, IPaintEven
 
     // --- independent gun and radar -------------------------------------------
     public void setAdjustGunForRobotTurn(boolean independent) { peer.adjGun = independent; }
-    public void setAdjustRadarForGunTurn(boolean independent) { peer.adjRadar = independent; }
-    public void setAdjustRadarForRobotTurn(boolean independent) { peer.adjRadarRobot = independent; }
+    public void setAdjustRadarForGunTurn(boolean independent) {
+        peer.adjRadar = independent;
+        if (!peer.adjRadarRobotSet) peer.adjRadarRobot = independent;   // as in Robocode
+    }
+    public void setAdjustRadarForRobotTurn(boolean independent) { peer.adjRadarRobot = independent; peer.adjRadarRobotSet = true; }
     public boolean isAdjustGunForRobotTurn() { return peer.adjGun; }
     public boolean isAdjustRadarForGunTurn() { return peer.adjRadar; }
     public boolean isAdjustRadarForRobotTurn() { return peer.adjRadarRobot; }

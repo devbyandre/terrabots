@@ -3,6 +3,7 @@ Compare Terrabots with real Robocode, tick by tick.
 
     python tools/robocode_conformance/conformance.py            # probe scenario
     python tools/robocode_conformance/conformance.py --duel     # two Duelists fighting
+    python tools/robocode_conformance/conformance.py --samples  # Robocode's sample bots, 50 rounds per pair
 
 Downloads Robocode (EPL, from its GitHub releases) into a cache folder the first
 time, runs a probe bot of ours in it headless (Java 17 in Docker, since Robocode
@@ -14,6 +15,10 @@ Needs Docker, javac, and the terrabots-sandbox-robocode image. Results so far
 (Robocode 1.11.1): the probe scenario matches exactly (0 differences in 1416
 records). Duels diverge once two bullets resolve in the same tick, because
 Robocode processes bullets in random order; the rules themselves agree.
+--samples plays pairs of Robocode's own sample bots (taken from the downloaded
+Robocode, not redistributed) for many rounds in both engines and compares each
+pair's share of the points: a statistical check of whole battles. Latest run
+(50 rounds per pair): all eight pairs within 0.02, mean difference 0.008.
 """
 
 from __future__ import annotations
@@ -145,6 +150,9 @@ def parse(text: str) -> dict[tuple[int, str], dict[str, str]]:
     return out
 
 
+ANGLES = {"h", "g", "r"}   # headings in the probe log (absolute, degrees)
+
+
 def diff(real: str, ours: str, tolerance: float = 0.01) -> list[tuple]:
     a, b = parse(real), parse(ours)
     found = []
@@ -155,7 +163,10 @@ def diff(real: str, ours: str, tolerance: float = 0.01) -> list[tuple]:
             continue
         for k, v in x.items():
             try:
-                if k in y and abs(float(v) - float(y[k])) > tolerance:
+                d = abs(float(v) - float(y[k])) if k in y else 0.0
+                if k in ANGLES:   # 359.99999 and 0 are the same heading
+                    d = min(d, 360 - d)
+                if d > tolerance:
                     found.append((key, k, v, y[k]))
             except ValueError:
                 if y.get(k) != v:
@@ -163,10 +174,80 @@ def diff(real: str, ours: str, tolerance: float = 0.01) -> list[tuple]:
     return found
 
 
+SAMPLE_PAIRS = [("Crazy", "SpinBot"), ("Walls", "Tracker"), ("RamFire", "Corners"), ("Fire", "TrackFire"),
+                ("SpinBot", "Walls"), ("Crazy", "Tracker"), ("MyFirstRobot", "Corners"), ("VelociRobot", "RamFire")]
+
+
+def samples_jar(home: Path, out: Path) -> Path:
+    stage = out / "samples"
+    shutil.rmtree(stage, ignore_errors=True)
+    (stage / "sample").mkdir(parents=True)
+    for f in (home / "robots" / "sample").iterdir():
+        if f.suffix in (".class", ".properties"):
+            shutil.copy(f, stage / "sample")
+    jar = out / "samples.jar"
+    subprocess.run(["jar", "--create", "--file", str(jar), "-C", str(stage), "."], check=True)
+    return jar
+
+
+def real_pair(home: Path, a: str, b: str, rounds: int) -> float:
+    import os
+    (home / "pair.battle").write_text(
+        f"robocode.battleField.width={FIELD[0]}\nrobocode.battleField.height={FIELD[1]}\n"
+        f"robocode.battle.numRounds={rounds}\nrobocode.battle.selectedRobots=sample.{a},sample.{b}\n")
+    opens = ["--add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
+             "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"]
+    subprocess.run(["docker", "run", "--rm", "--network", "none", "--user", f"{os.getuid()}:{os.getgid()}",
+                    "-e", "HOME=/tmp", "-v", f"{home}:/rc", "-w", "/rc", "eclipse-temurin:17-jdk",
+                    "java", "-Xmx512M", "-cp", "libs/*", "-XX:+IgnoreUnrecognizedVMOptions", *opens,
+                    "robocode.Robocode", "-battle", "/rc/pair.battle", "-nodisplay", "-nosound",
+                    "-results", "/rc/pair-results.txt"], check=True, capture_output=True)
+    totals = {}
+    for line in (home / "pair-results.txt").read_text().splitlines():
+        m = re.match(r"\S+: sample\.(\w+)\s+(\d+)", line)
+        if m:
+            totals[m.group(1)] = float(m.group(2))
+    return totals[a] / ((totals[a] + totals[b]) or 1)
+
+
+def ours_pair(args: tuple) -> float:
+    jar, a, b, rounds, seed = args
+    from terrabots.battle import BattleConfig, BattleRunner
+    from terrabots.battle.sandbox import JarEntry
+
+    entries = {e.class_name: e for e in JarEntry.from_jar(jar)}
+    cfg = BattleConfig(rounds=rounds, seed=seed, terrain="flat", width=FIELD[0] // 16, height=FIELD[1] // 16,
+                       hit_energy_return="robocode", max_ticks_per_round=10000)
+    rows = {r["name"]: r["total"] for r in BattleRunner(cfg, [(entries[a], 1), (entries[b], 1)],
+                                                         time_budget_ms=None).run().rows}
+    return rows[a] / ((rows[a] + rows[b]) or 1)
+
+
+def compare_samples(rounds: int = 50) -> None:
+    from concurrent.futures import ProcessPoolExecutor
+
+    home = robocode_home()
+    jar = samples_jar(home, CACHE)
+    with ProcessPoolExecutor(4) as pool:
+        ours = list(pool.map(ours_pair, [(jar, a, b, rounds, 7 + i) for i, (a, b) in enumerate(SAMPLE_PAIRS)]))
+    print(f"share of points of the first bot, {rounds} rounds per pair")
+    print(f"{'pair':28} {'Robocode':>9} {'Terrabots':>10} {'diff':>7}")
+    diffs = []
+    for (a, b), share in zip(SAMPLE_PAIRS, ours):
+        real = real_pair(home, a, b, rounds)
+        diffs.append(share - real)
+        print(f"{a + ' vs ' + b:28} {real:9.3f} {share:10.3f} {share - real:+7.3f}")
+    print(f"mean absolute difference {sum(abs(d) for d in diffs) / len(diffs):.3f}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Compare Terrabots with real Robocode, tick by tick.")
     ap.add_argument("--duel", action="store_true", help="two Duelists instead of the probe vs SittingDuck")
+    ap.add_argument("--samples", action="store_true", help="Robocode's sample bots, many rounds per pair")
     a = ap.parse_args()
+    if a.samples:
+        compare_samples()
+        return
     scenario = SCENARIOS["duel" if a.duel else "probe"]
     home = robocode_home()
     jar = build_probes(CACHE)

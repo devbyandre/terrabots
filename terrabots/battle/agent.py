@@ -68,6 +68,7 @@ class BattleAgent(abc.ABC):
     adjust_gun_for_body_turn: ClassVar[bool] = False
     adjust_radar_for_gun_turn: ClassVar[bool] = False
     droid: ClassVar[bool] = False   # Robocode Droid: more energy, no radar
+    plain_robot: ClassVar[bool] = False  # Robocode's Robot (not AdvancedRobot): no wall damage, fire assistance
 
     def __init__(self, profile: CreatureMoveProfile | None = None) -> None:
         self.profile: CreatureMoveProfile = profile or CreatureMoveProfile()

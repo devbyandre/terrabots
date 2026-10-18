@@ -146,6 +146,7 @@ class _Queue:
     radar_turn: float = 0.0
     fire: float = 0.0
     max_velocity: float = math.inf
+    scan: bool = False
 
 
 class AdvancedRobot(BattleAgent):
@@ -239,6 +240,11 @@ class AdvancedRobot(BattleAgent):
 
     def set_turn_radar_left(self, degrees: float) -> None:
         self._q.radar_turn = -degrees
+
+    def scan(self) -> None:
+        """Scan this tick even if nothing moves (Robocode's scan(); a tank that neither
+        moves nor turns doesn't scan otherwise)."""
+        self._q.scan = True
 
     def set_max_velocity(self, velocity: float) -> None:
         self._q.max_velocity = abs(velocity)
@@ -379,8 +385,9 @@ class AdvancedRobot(BattleAgent):
             stoppable = _max_stoppable_speed(rem, self.rules.deceleration)
             velocity = math.copysign(min(self.rules.max_velocity, q.max_velocity, stoppable),
                                      q.distance)
+        scan, q.scan = q.scan, False
         return BattleAction(velocity=velocity, body_turn=q.body_turn, gun_turn=q.gun_turn,
-                            radar_turn=q.radar_turn, fire=q.fire)
+                            radar_turn=q.radar_turn, fire=q.fire, scan=scan)
 
 
 class TeamRobot(AdvancedRobot):

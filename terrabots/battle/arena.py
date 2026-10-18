@@ -55,7 +55,7 @@ from terrabots.battle.events import (
     ScannedBot,
     TeamMessage,
 )
-from terrabots.battle.geometry import clamp, distance, heading_to, normalize_heading
+from terrabots.battle.geometry import clamp, distance, heading_to, normalize_angle, normalize_heading
 from terrabots.battle.isolation import BotProcessError, RemoteBot
 from terrabots.battle.observation import BattleObservation, TerrainView
 from terrabots.battle.physics import (
@@ -192,15 +192,19 @@ class Arena:
         standing = self.standing()
 
         actions = self._decide_all(standing)
+        scanned = {s.body.bot_id: [e.bearing for e in s.events["scanned_bots"]] for s in standing}
         for s in standing:
             s.events = _empty_events()
         self._comms.clear()
 
         for s in standing:
-            self._fire(s, actions[s.body.bot_id])
+            self._fire(s, actions[s.body.bot_id], scanned[s.body.bot_id])
         self._move_bullets()
         for s in standing:
             s.body.gun_heat = max(0.0, s.body.gun_heat - self.cfg.gun_cooling_rate)
+        # Robocode scans only for tanks that moved or turned something (or asked to).
+        before = {s.body.bot_id: (s.body.x, s.body.y, s.body.heading, s.body.gun_heading, s.body.radar_heading)
+                  for s in standing}
         for s in standing:
             a = actions[s.body.bot_id]
             if s.body.state == ALIVE:
@@ -212,7 +216,9 @@ class Arena:
             self._move(s, actions[s.body.bot_id])
         for s in standing:
             if s.body.state == ALIVE:
-                if not s.agent.droid:
+                b = s.body
+                moved = before[b.bot_id] != (b.x, b.y, b.heading, b.gun_heading, b.radar_heading)
+                if not s.agent.droid and (moved or actions[b.bot_id].scan):
                     self._radar_sweep(s)
                 if actions[s.body.bot_id].shout is not None:
                     self._shout(s, actions[s.body.bot_id])
@@ -316,7 +322,7 @@ class Arena:
     # Bullets
     # ------------------------------------------------------------------
 
-    def _fire(self, s: _Slot, a: BattleAction) -> None:
+    def _fire(self, s: _Slot, a: BattleAction, scanned: list[float]) -> None:
         b = s.body
         if b.state != ALIVE or a.fire <= 0 or b.gun_heat > 0:
             return
@@ -331,12 +337,25 @@ class Arena:
             b.energy, b.state = 0.0, DISABLED
         z = float(self.world.elevation_map[b.cell]) + s.agent.profile.eye_height_offset
         bullet = Bullet(self._next_bullet_id, b.bot_id, b.x, b.y, z,
-                        b.gun_heading, power, self.cfg.bullet_speed(power))
+                        self._aim(s, a, scanned), power, self.cfg.bullet_speed(power))
         self._bullets.append(bullet)
         self._next_bullet_id += 1
         self.scorer.shot(b.bot_id)
         s.events["bullet_fired"].append(BulletFired(
             bullet.bullet_id, bullet.x, bullet.y, bullet.heading, power, bullet.speed))
+
+    @staticmethod
+    def _aim(s: _Slot, a: BattleAction, scanned: list[float]) -> float:
+        """The gun's heading, or for a Robocode plain Robot with gun and radar aligned,
+        the bearing of a bot it scanned this tick (Robocode's fire assistance)."""
+        b = s.body
+        if (a.fire_heading is None or not s.agent.plain_robot
+                or abs(normalize_angle(b.gun_heading - b.radar_heading)) > 1e-9):
+            return b.gun_heading
+        for bearing in scanned:
+            if abs(normalize_angle(a.fire_heading - bearing)) < 1e-6:
+                return normalize_heading(a.fire_heading)
+        return b.gun_heading
 
     def _move_bullets(self) -> None:
         """Robocode's bullet update (BulletPeer.update), one bullet after another in
@@ -435,6 +454,30 @@ class Arena:
     # Bodies
     # ------------------------------------------------------------------
 
+    def _contact(self, x0: float, y0: float, x1: float, y1: float, s: _Slot, half: float) -> tuple[float, float]:
+        """Where a body moving (x0, y0) -> (x1, y1) touches a wall."""
+        t = 1.0
+        for p0, p1, size in ((x0, x1, self.world.width), (y0, y1, self.world.height)):
+            if p1 < half:
+                t = min(t, (half - p0) / (p1 - p0))
+            elif p1 > size - half:
+                t = min(t, (size - half - p0) / (p1 - p0))
+
+        def at(f: float) -> tuple[float, float]:   # clamped: rounding must not leave the arena
+            return (clamp(x0 + (x1 - x0) * f, half, self.world.width - half),
+                    clamp(y0 + (y1 - y0) * f, half, self.world.height - half))
+
+        def free(f: float) -> bool:
+            return blocked_reason(x0, y0, *at(f), self.world, self._movement, s.agent.profile, half) is None
+        t = max(0.0, t)
+        if not free(t):
+            lo, hi = 0.0, t        # terrain: the last free point, found by halving
+            for _ in range(30):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if free(mid) else (lo, mid)
+            t = lo
+        return at(t)
+
     def _move(self, s: _Slot, a: BattleAction) -> None:
         b = s.body
         if b.state != ALIVE:
@@ -449,7 +492,9 @@ class Arena:
 
         reason = blocked_reason(b.x, b.y, nx, ny, self.world, self._movement, s.agent.profile, half)
         if reason is not None:
-            dmg = self.cfg.wall_damage(b.velocity)
+            dmg = 0.0 if s.agent.plain_robot else self.cfg.wall_damage(b.velocity)
+            # Robocode backs the tank up along its path until it just touches the wall.
+            b.x, b.y = self._contact(b.x, b.y, nx, ny, s, half)
             # Bearing of the wall: the direction we were driving in.
             bearing = b.heading if b.velocity > 0 else normalize_heading(b.heading + 180)
             s.events["hit_wall"].append(HitWall(bearing, dmg))

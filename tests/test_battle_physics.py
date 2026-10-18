@@ -168,7 +168,7 @@ def test_crossing_bullets_intersect() -> None:
     assert segments_intersect_t((0, 0), (2, 2), (0, 2), (2, 0)) == pytest.approx(0.5)
     assert segments_intersect_t((0, 0), (1, 0), (0, 1), (1, 1)) is None
     # head-on along one line
-    assert segments_intersect_t((0, 0), (1, 0), (1.5, 0), (0.5, 0)) == pytest.approx(0.5)
+    assert segments_intersect_t((0, 0), (1, 0), (1.5, 0), (0.5, 0)) is None   # head-on passes, as in Robocode
     assert segments_intersect_t((0, 0), (1, 0), (3, 0), (2, 0)) is None
 
 

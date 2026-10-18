@@ -102,6 +102,7 @@ public final class Host {
                     ok.put("adj_gun", false);
                     ok.put("adj_radar", false);
                     ok.put("colors", new HashMap<String, Object>());
+                    ok.put("plain_robot", !peer.isAdvanced());   // Robocode's Robot: no wall damage, fire assistance
                     send(ok);
                     break;
                 }

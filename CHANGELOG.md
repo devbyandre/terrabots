@@ -41,6 +41,21 @@
   3 px bullet radius) before tanks, the first tank touched rather than the nearest;
   the radar meets the tank's square box; inactivity drains from the 452nd quiet
   tick and disables a tank at 0 before it dies. Results of seeded battles change.
+- The radar only scans when the tank moved or turned something that tick, or
+  asked for a scan (`BattleAction.scan`, `AdvancedRobot.scan()`), as in Robocode.
+- Robocode adapter: turns are counted in radians with Robocode's own arithmetic
+  (a turn can end a tick later than the degrees suggest, and bots notice);
+  `scan()` interrupts a running `onScannedRobot`; `isTeammate` is true for the
+  bot's own name; `setAdjustRadarForGunTurn` also sets the body-turn adjustment
+  unless the bot set that itself; blocking calls (`ahead`, `turnGunRight`, ...)
+  always take at least one turn.
+- Robocode rules for plain `Robot`s (`BattleAgent.plain_robot`): no wall damage,
+  and fire assistance (a shot fired from this turn's `onScannedRobot` with gun and
+  radar aligned flies straight at the scanned robot; `BattleAction.fire_heading`,
+  checked by the engine).
+- A tank that hits a wall ends its move touching it, not where it started the tick.
+- Two bullets flying along the same line pass each other, as in Robocode (only
+  crossing paths collide).
 - The tournament workflow only checks pull requests (sandboxed, read-only); the
   leaderboard is built by the maintainer, where private submissions are.
 - Process isolation sends the terrain after the bot has started, so a bot that

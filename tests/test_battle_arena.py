@@ -240,8 +240,9 @@ def test_survival_points_for_outliving_enemies() -> None:
 # --- Robocode rules from RoboWiki (Game_Physics, Scoring) -----------------
 
 def test_bullets_that_cross_destroy_each_other() -> None:
+    # Paths at right angles, meeting at (15.5, 15.5) in the same tick.
     arena = make_arena(WorldGrid(30, 30), [Gunner(), Gunner()],
-                       [(5.5, 15.5, 90, 90), (25.5, 15.5, 270, 270)])
+                       [(5.5, 15.5, 90, 90), (15.5, 25.5, 180, 180)])
     for _ in range(40):
         frame = arena.step()
         if any(e["type"] == "bullet_hit_bullet" for e in frame["events"]):
@@ -365,3 +366,54 @@ def test_bullet_events_report_end_of_tick_positions() -> None:
     x0, y0, speed = shooter.fired[hit.bullet_id]
     flown = math.hypot(hit.x - x0, hit.y - y0) / speed
     assert abs(flown - round(flown)) < 1e-9
+
+
+# --- Robocode's wall contact and plain Robots --------------------------------
+class Driver(BattleAgent):
+    """Drives north at full speed (heading 0 = north)."""
+
+    def decide(self, obs: BattleObservation) -> BattleAction:
+        return BattleAction(velocity=8.0)
+
+
+class PlainDriver(Driver):
+    plain_robot = True
+
+
+@pytest.mark.parametrize("agent, damaged", [(Driver(), True), (PlainDriver(), False)])
+def test_wall_hit_ends_touching_the_wall_and_spares_plain_robots(agent: BattleAgent, damaged: bool) -> None:
+    arena = make_arena(WorldGrid(40, 30), [agent, Duck()], [(5.5, 27.0, 0, 0), (30.5, 5.5, 0, 0)])
+    half = arena.cfg.body_half_width
+    for _ in range(10):
+        arena.step()
+    body = arena.slots[0].body
+    assert body.y == pytest.approx(30 - half)     # flush with the edge, not left short of it
+    assert (body.energy < 100) == damaged
+
+
+class Assisted(BattleAgent):
+    """Asks for fire assistance towards whatever it scanned, or towards `fake`."""
+    plain_robot = True
+    fake: float | None = None
+
+    def on_round_start(self, round_number: int, rounds: int) -> None:
+        self.fired: list[float] = []
+
+    def decide(self, obs: BattleObservation) -> BattleAction:
+        self.fired += [f.heading for f in obs.bullet_fired]
+        if obs.scanned_bots or self.fake is not None:
+            aim = self.fake if self.fake is not None else obs.scanned_bots[0].bearing
+            return BattleAction(fire=1.0, fire_heading=aim, gun_turn=10)
+        return BattleAction(gun_turn=10)    # the radar turns with the gun: they stay aligned
+
+
+@pytest.mark.parametrize("plain, fake, expected", [(True, None, 45.0), (False, None, 40.0), (True, 120.0, 30.0)])
+def test_fire_assistance_only_towards_a_scanned_bot(plain: bool, fake: float | None, expected: float) -> None:
+    shooter = Assisted()
+    shooter.plain_robot, shooter.fake = plain, fake
+    # The target sits at 45°; the sweep from 30° to 40° reaches its box, the gun fires at 40°.
+    # A heading towards nothing scanned (120°) is ignored: the first shot goes along the gun.
+    arena = make_arena(WorldGrid(40, 40), [shooter, Duck()], [(10.5, 10.5, 30, 30), (20.5, 20.5, 0, 0)])
+    for _ in range(5):
+        arena.step()
+    assert shooter.fired and shooter.fired[0] == pytest.approx(expected)

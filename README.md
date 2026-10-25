@@ -10,7 +10,7 @@ high ground lets you shoot over cover, and steep slopes stop your tracks.
 
 [![CI](https://github.com/devbyandre/terrabots/actions/workflows/ci.yml/badge.svg)](https://github.com/devbyandre/terrabots/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
-[![License: MIT](https://img.shields.io/badge/license-MIT-f2b33d)](LICENSE)
+[![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-f2b33d)](LICENSE)
 
 [Website](https://devbyandre.github.io/terrabots/) · [Quick start](#quick-start) · [Write a bot](#your-first-tank) · [Notebooks](notebooks/) · [Battle guide](docs/battle-guide.md) · [Survival guide](docs/survival-guide.md) · [Leaderboard](docs/leaderboard.md)
 
@@ -378,12 +378,21 @@ and [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
-Bug reports, bots, lessons and pull requests are welcome; see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, bots, lessons (notebooks) and framework improvements are welcome;
+see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE) © André Munzinger. Inspired by
+[Mozilla Public License 2.0](LICENSE) © André Munzinger.
+
+In short: use Terrabots for anything (teaching, research, commercial work,
+hosting a server) and license your own bots and code that builds on it however
+you like. If you distribute a changed version of Terrabots' own files, publish
+those changes under the MPL too, so everyone benefits. Hosting it publicly is
+welcome; please don't present a fork or service as the official Terrabots, see
+[TRADEMARKS.md](TRADEMARKS.md).
+
+Inspired by
 [Robocode](https://robocode.sourceforge.io/), the tank-programming game that got
 a generation of students into code. Terrabots is an independent project and not
 affiliated with Robocode.

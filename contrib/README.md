@@ -1,6 +1,7 @@
 # Community bots (public)
 
-Bots whose authors chose to publish their code, under the MIT license. Each
+Bots whose authors chose to publish their code, under the MPL-2.0 license like
+the rest of Terrabots. Each
 author has a folder named after their GitHub user name:
 
 ```

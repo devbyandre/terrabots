@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Contributing guide for lessons (notebooks) and framework changes; name and
+  hosting policy (`TRADEMARKS.md`).
 - Persistent bot storage (`self.storage`, `bot_data/`, 200 KB quota per bot class).
 - Demo bots: Walls, RamFire, Corners, Learner (battle), Grazer (survival).
 - Viewer: survival mode in the setup screen, fog of war (F), per-tank radar
@@ -34,6 +36,9 @@
   and diffs their per-tick logs.
 
 ### Changed
+- License changed from MIT to the Mozilla Public License 2.0: changes to
+  Terrabots' own files stay open; bots and projects that use it can have any
+  license. Public `contrib/` bots are MPL-2.0 too.
 - Battle physics now follow Robocode exactly where a probe found differences: guns
   fire before bullets move and cool after (a new bullet takes its first step in
   the tick it's fired, and the queued shot no longer lets a bot fire a tick

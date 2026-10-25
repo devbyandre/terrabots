@@ -3,6 +3,26 @@
 Thanks for helping. Terrabots is a teaching and research platform, so code that a
 learner can read counts as much as code that works.
 
+There are three kinds of contributions, each with its own section below:
+
+- **[Lessons](#lessons-notebooks):** Jupyter notebooks that teach one concept
+  with a bot (targeting, statistics, learning, swarm behaviour).
+- **[Framework](#framework):** the engine, viewer, maps, adapters and tools,
+  e.g. new rules like more realistic ballistics.
+- **[Bots](#submit-a-bot):** for the tournament, private or public.
+
+## License of contributions
+
+Terrabots is licensed under the [Mozilla Public License 2.0](LICENSE). By opening
+a pull request you agree that your contribution is licensed under the MPL-2.0 as
+well (no separate agreement to sign). You keep the copyright on your work. Only
+contribute code you wrote or are allowed to contribute under these terms; don't
+copy code under licenses that are incompatible with the MPL (for example from
+RoboRumble bots, see [docs/robocode-bots.md](docs/robocode-bots.md#licences)).
+
+Your own bots and projects that only *use* Terrabots aren't affected: license
+them as you like. Private bot submissions stay private (see below).
+
 ## Setup
 
 ```bash
@@ -51,7 +71,7 @@ not reused; it's deleted from the tournament machine when you ask.
 ### Public (only if you want to)
 
 Open a pull request adding `contrib/<your-github-name>/<bot>.py` and an empty
-`__init__.py`. Its code is then public under the MIT license, listed in the
+`__init__.py`. Its code is then public under the MPL-2.0, listed in the
 setup screen ("Community bots"), and learners can read it. The first line of the
 class docstring is shown on the leaderboard.
 
@@ -79,13 +99,60 @@ terrabots-battle --headless --sandbox --rounds 10 --bot contrib.<you>.<bot>:<Cla
 
 Bots that break the rules or try to escape the sandbox are removed.
 
-## Good first contributions
+## Lessons (notebooks)
 
-- A new demo bot in `terrabots/agents/` with a one-line docstring (it shows up
-  in the setup screen) and a test that it runs a battle without errors.
-- A lesson or exercise built on Terrabots (statistics on battle results,
-  a targeting technique, an ML experiment).
-- Viewer improvements, checked in a real browser.
+Most people meet Terrabots through a lesson, so a good notebook is one of the
+most valuable contributions. Look at the [existing ones](notebooks/) first.
+
+- **One concept per notebook**, stated in the first cell: what you'll learn,
+  what you need to know already, how long it takes (aim for 20–40 minutes).
+- **Learn by experiment.** Build a bot or change one, run seeded battles, look
+  at the numbers. Explain the idea, then let the data show it.
+- **Reproducible.** Seed every battle and random generator, so readers get the
+  numbers in the saved outputs. Keep a full run under a few minutes on a laptop.
+- **Saved outputs.** Commit the notebook *with* outputs (Restart & Run All
+  first): GitHub shows them, so people can read a lesson before installing.
+- **Only Terrabots' dependencies** plus what `pip install -e ".[notebooks]"`
+  brings. If a lesson really needs more (scikit-learn, PyTorch), say so in the
+  first cell and propose adding it to the `notebooks` extra.
+- **Exercises** at the end, with hints rather than full solutions.
+- **Sources** for the theory (papers, books, the RoboWiki).
+- Name it `NN_topic.ipynb` with the next free number and add a row to the
+  table in [notebooks/README.md](notebooks/README.md).
+
+Ideas: wave surfing, guess factor targeting, Bayesian estimation of enemy
+movement, A/B testing bots with paired battles, reinforcement learning,
+genetic algorithms tuning a bot, flocking in survival mode, team strategies.
+
+Open an issue with the idea first if you like; it's a good way to get feedback
+before writing a long notebook.
+
+## Framework
+
+Engine changes affect every bot, so they need a bit more care.
+
+- **Open an issue first** for anything bigger than a fix: a new rule, a new
+  game mode, an API change. Say what it's for and what it changes for existing
+  bots.
+- **Robocode rules stay the default.** Battles with default settings match real
+  Robocode tick by tick (checked with `tools/robocode_conformance/`), and the
+  Robocode adapter and the leaderboard rely on that. New or more realistic rules
+  (e.g. ballistic arcs, wind, bullets hitting terrain, recoil) go in as options
+  in `BattleConfig` (`terrabots/battle/config.py`) whose default keeps today's
+  behaviour, with a row in the settings schema of the setup screen
+  (`terrabots/viewer/battle.html`), in the settings table of
+  [docs/arena-spec.md](docs/arena-spec.md#3-battle-settings-battleconfig), and
+  a few words in the physics section of [docs/battle-guide.md](docs/battle-guide.md#3-physics).
+- **Keep the invariants** (see Ground rules) and keep seeded battles
+  reproducible.
+- **Tests with every rule**, plus a note in [CHANGELOG.md](CHANGELOG.md).
+- **Bot API changes** need the bot templates, guides and notebooks updated in
+  the same pull request, and should keep existing bots working where possible.
+- Viewer changes: check them in a real browser and say which one.
+
+Smaller things are always welcome: a new demo bot in `terrabots/agents/` (with a
+one-line docstring, which shows in the setup screen, and a test that it runs a
+battle), new maps, docs fixes, clearer error messages.
 
 ## Reporting bugs
 

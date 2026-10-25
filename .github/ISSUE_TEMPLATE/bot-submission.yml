@@ -38,7 +38,7 @@ body:
       description: Without a yes here, only the bot's name, your GitHub name and its scores are published.
       options:
         - "No: keep my code private (closed source on the leaderboard)"
-        - "Yes: publish it in contrib/ under the MIT license"
+        - "Yes: publish it in contrib/ under the MPL-2.0 license"
     validations:
       required: true
   - type: textarea

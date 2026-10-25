@@ -8,7 +8,7 @@ engine over the sandbox's JSON protocol. Every bot runs in its own locked-down
 container ([docs/sandbox.md](../../docs/sandbox.md)).
 
 Written from Robocode's public API documentation, not from Robocode's source.
-MIT licensed, like the rest of Terrabots. It contains no bots: a bot's jar is
+MPL-2.0 licensed, like the rest of Terrabots. It contains no bots: a bot's jar is
 mounted into its container when it plays. Using it is in
 [docs/robocode-bots.md](../../docs/robocode-bots.md).
 
